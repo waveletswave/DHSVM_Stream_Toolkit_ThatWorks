@@ -1,0 +1,38 @@
+# ==========================================
+# GIS & Spatial Data Files (DO NOT UPLOAD)
+# ==========================================
+*.tif
+*.tiff
+*.dem
+*.asc
+*.gpkg
+*.sqlite
+
+# Shapefile auxiliary files (Only track .shp, .shx, .dbf, .prj if needed, but usually ignore generated ones)
+*.sbn
+*.sbx
+*.cpg
+*.qix
+*.qpj
+
+# ==========================================
+# Python & QGIS Caches
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.qgs~
+*.qgz~
+
+# ==========================================
+# IDE & OS Files
+# ==========================================
+.DS_Store
+.idea/
+.vscode/
+
+# ==========================================
+# Ignore specific heavy folders from your pipeline
+# ==========================================
+Reprojected_DEM/
+Reprojected_Watersheds/
