@@ -21,10 +21,10 @@ PyQGIS raster sampling functions (`provider.sample`) can return a boolean succes
 
 ### 2. Hydrologic Analysis Tools
 
-* `extract_mainstem_profile.py`: Automatically identifies the watershed outlet, traces the main stem upstream using maximum cumulative drainage area (`meanmsq`), and extracts the longitudinal profile.
-  * Visualization: Plots a high quality scatter plot of the profile, applying a color gradient to represent local slope.
+* `plot_mainstem.py`: Automatically identifies the watershed outlet and traces the true physical main stem upstream using DEM elevation routing. It also calculates upstream accumulated length as a proxy for drainage area.
+  * Visualization: Plots a high quality scatter plot of the profile, applying a color gradient to represent local slope, alongside a secondary axis for the drainage area proxy.
   * Knickpoint Detection: Automatically flags statistically significant abrupt changes in localized slope along the main stem.
-  * Data Export: Exports a detailed `.csv` containing distance, elevation, slope, and knickpoint boolean flags for further statistical analysis.
+  * Data Export: Exports a detailed `.csv` containing distance upstream, elevation, upstream accumulated length, smoothed slope, and knickpoint boolean flags.
 
 ## Output Artifacts
 
@@ -41,7 +41,7 @@ When successfully executed in the QGIS Python Console, the pipeline produces the
 Run the scripts sequentially inside the QGIS Python Console. Ensure the Processing plugin and GRASS provider are enabled.
 
 1. Execute `createstreamnetwork.py` first to generate the topological shapefiles and `.dat` files.
-2. Execute `extract_mainstem_profile.py` to validate the slope calculations and visualize your main stem. The script utilizes an auto discovery mechanism so no manual path hardcoding is required as long as it sits within the same project directory tree.
+2. Execute `plot_mainstem.py` to validate the slope calculations and visualize your main stem. The script utilizes an auto discovery mechanism so no manual path hardcoding is required as long as it sits within the same project directory tree.
 
 ---
 
