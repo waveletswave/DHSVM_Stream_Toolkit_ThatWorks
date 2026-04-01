@@ -1001,6 +1001,25 @@ print("[step] Write stream.map.dat (0–360° aspect)…")
 _ = _write_stream_map(vl_lines, str(WS), topo_fids, new_id, az_map)
 
 # ----------------------------- #
+#  Generate Soil Depth Binary   #
+# ----------------------------- #
+print("[step] Compute Soil Depth via soildepthscript.py…")
+try:
+    spec = importlib.util.spec_from_file_location("soildepthscript", str(SCRIPT_DIR/"soildepthscript.py"))
+    mod  = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    
+    if hasattr(mod, "generate_soildepth"):
+        bin_out = p("soildepth.bin")
+        tif_out = p("soildepth.tif")
+        
+        mod.generate_soildepth(elev, stream_slope, flow_acc, bin_out, tif_out)
+    else:
+        print("[warn] generate_soildepth() function not found in soildepthscript.py.")
+except Exception as e:
+    print(f"[error] Soil depth generation failed: {e}")
+
+# ----------------------------- #
 #              Done             #
 # ----------------------------- #
 print("\nPipeline finished successfully.")
@@ -1011,3 +1030,4 @@ print(f"  - {stream_slope}")
 print(f"  - {p('stream.map.dat')}")
 print(f"  - {p('stream.network.dat')}")
 print(f"  - {p('stream.class.dat')}")
+print(f"  - {p('soildepth.bin')}")
