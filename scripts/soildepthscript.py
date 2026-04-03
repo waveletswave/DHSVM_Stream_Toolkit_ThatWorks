@@ -25,8 +25,10 @@ def p(*xs) -> str:
 # =====================================================================
 # PNNL Soil Depth Parameters (Southern Appalachians Calibration)
 # =====================================================================
-MIN_DEPTH = 1.5   
-MAX_DEPTH = 15.0  
+
+# Hydrologically active depth calibration based on Variable Source Area theory.
+MIN_DEPTH = 1.6   # Must be > 1.5m (total root zone depth in .dhs)
+MAX_DEPTH = 5.0   # Active subsurface stormflow zone  
 
 WT_SLOPE  = 0.7
 WT_SOURCE = 0.0
