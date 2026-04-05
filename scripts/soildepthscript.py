@@ -28,7 +28,18 @@ def p(*xs) -> str:
 
 # Hydrologically active depth calibration based on Variable Source Area theory.
 MIN_DEPTH = 1.6   # Must be > 1.5m (total root zone depth in .dhs)
-MAX_DEPTH = 5.0   # Active subsurface stormflow zone  
+MAX_DEPTH = 5.0   # Active subsurface stormflow zone
+
+# # Hydrologically active depth calibration based on Variable Source Area (VSA) theory 
+# # and Coweeta Hydrologic Laboratory field observations.
+
+# # Minimum depth constrained by the basin-wide average soil thickness (~3.0m), 
+# # allowing for localized geomorphic thinning on steep, erosional ridges (Swank & Crossley, 1988).
+# MIN_DEPTH = 2.0   
+
+# # Maximum active depth corresponds to the average depth of unweathered bedrock 
+# # (saprolite thickness) observed in the Coweeta basin valleys (Swank & Douglass, 1975).
+# MAX_DEPTH = 6.0
 
 WT_SLOPE  = 0.7
 WT_SOURCE = 0.0
