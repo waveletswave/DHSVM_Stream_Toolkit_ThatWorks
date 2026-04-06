@@ -53,4 +53,4 @@ The scripts utilize an auto-discovery mechanism, so no manual path hardcoding is
 
 ---
 **Author:** Y. Song <br>
-**Organization:** Duke University / PNNL
+**Organization:** Duke University
