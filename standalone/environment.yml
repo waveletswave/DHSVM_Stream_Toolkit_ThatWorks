@@ -1,0 +1,17 @@
+name: dhsvm-prep
+channels:
+  - defaults
+  - https://repo.anaconda.com/pkgs/main
+  - https://repo.anaconda.com/pkgs/r
+dependencies:
+  - fiona
+  - geopandas
+  - matplotlib
+  - networkx
+  - numpy
+  - pandas
+  - pyproj
+  - python=3.11
+  - rasterio
+  - shapely
+prefix: /opt/anaconda3/envs/dhsvm-prep
