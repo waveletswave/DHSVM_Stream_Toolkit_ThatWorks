@@ -1,58 +1,68 @@
 # DHSVM Spatial & Stream Network Toolkit (That Actually Works)
 
-This repository provides a comprehensive QGIS, GRASS GIS, and Python workflow for generating all spatial inputs, stream networks, and initial model states required by the Distributed Hydrology Soil Vegetation Model (DHSVM). 
+A QGIS + Python toolkit for generating all spatial inputs, stream networks, and initial model states required by the Distributed Hydrology Soil Vegetation Model (DHSVM).
 
-This toolkit builds upon standard DHSVM preprocessing methods but introduces critical bug fixes, removes dependencies on legacy C-utilities, and enforces strict workspace organization to ensure physical accuracy and methodological reproducibility. 
+This repository now contains **two parallel implementations** of the same preprocessing pipeline:
 
-## Key Improvements and Bug Fixes
+| Implementation                | Location                      | Use Case                                                  |
+| ----------------------------- | ----------------------------- | --------------------------------------------------------- |
+| **QGIS Python Console** | [`qgis/`](./qgis/)             | Interactive desktop work, visual debugging                |
+| **Standalone CLI**      | [`standalone/`](./standalone/) | HPC / Duke DCC, batch processing, reproducible Slurm jobs |
+
+The standalone version uses `rasterio` + `geopandas` + `shapely` instead of the QGIS Python API, so it can be run from any terminal — including HPC compute nodes that have no GUI / X server.
+
+## Standalone migration progress
+
+| Module                      | QGIS file                                                    | Standalone file                    | Status                                             |
+| --------------------------- | ------------------------------------------------------------ | ---------------------------------- | -------------------------------------------------- |
+| Channel classification      | `qgis/channelclass.py`                                     | `standalone/channelclass.py`     | ✅ Verified byte-identical (DEM_CA_0406)           |
+| ROW/COL & SegID assignment  | `qgis/rowcolmap_robust.py`                                 | `standalone/rowcolmap.py`        | ✅ Verified byte-identical (DEM_CA_0406)           |
+| Main stem profile           | `qgis/plot_mainstem.py`                                    | `standalone/plot_mainstem.py`    | 🟡 Draft — pending verification                   |
+| Direct binary serialization | `qgis/dem_to_dhsvm_bins.py`                                | (already standalone, no QGIS deps) | ✅ Already QGIS-free                               |
+| State initialization        | `qgis/generate_dhsvm_states.py`                            | (already standalone, no QGIS deps) | ✅ Already QGIS-free                               |
+| Soil depth                  | `qgis/soildepthscript.py`                                  | (already standalone, no QGIS deps) | ✅ Already QGIS-free                               |
+| Pipeline orchestration      | `qgis/prep_dhsvm_inputs.py`                                | —                                 | 📋 Not yet ported                                  |
+| Vegetation maps             | `qgis/rdnbr_to_veg_bs.py`, `qgis/make_2class_veg_map.py` | —                                 | 📋 Not yet ported                                  |
+| Road/stream aspect          | (none)                                                       | (none)                             | ❌ Not needed for this toolkit's target watersheds |
+
+## Key Improvements and Bug Fixes (both implementations)
 
 * **Direct Binary Serialization (No More `myconvert`):** Replaces the cumbersome ESRI ASCII export workflow. The toolkit natively serializes Float32 and Int8 flat binaries directly from Python, completely bypassing the legacy `myconvert` C-utility.
-* **Physically Consistent Initial States:** Replaces `MakeModelStateBin` and legacy bash scripts. It safely handles Endianness (byte-order) for binary grid states and parses dynamically computed channel widths to generate physically accurate initial channel water volumes, preventing severe numerical shocks during the model spin-up period.
-* **Uniform Soil Depth Baselines:** Automatically generates a suite of uniform soil depth grids (e.g., 2.0m, 3.0m) that are perfectly pixel-aligned with the master mask. These serve as reliable control groups for subsurface stormflow parameter sensitivity testing.
-* **Topology Sampling Correction:** Fixes a common PyQGIS raster sampling bug where boolean success flags are misparsed. This ensures the routing algorithm accurately computes the true physical gradient ($\tan(\theta)$) for every segment in `stream.network.dat`.
-
-## Included Scripts
-
-### 1. Main Preparation Pipeline
-* `prep_dhsvm_inputs.py`: The main execution script. Coordinates DEM clipping, GRASS topological processing, and triggers all sub-modules to automatically generate ready-to-use binaries and stream files.
-* `dem_to_dhsvm_bins.py`: Handles direct `.bin` generation for DEM, mask, soil type, vegetation, and uniform depth baselines.
-* `generate_dhsvm_states.py`: Generates the initial condition grid binaries and the text-based channel state file.
-* `soildepthscript.py`: Generates a dynamic topographic soil depth raster using slope and source area weighting.
-
-### 2. Stream Topology & Classification
-* `channelclass.py`: Defines stream classes by contributing area and slope. Writes `stream.class.dat`.
-* `rowcolmap_robust.py`: Robust per-cell ROW/COL & SegID assignment using a top-left origin convention (matches DHSVM stream.map.dat format). Replaces the legacy `rowcolmap.py` and the misnamed `roadaspect.py` from earlier iterations.
-* `rowcolmap_legacy_bottom_left.py`: ⚠️ Deprecated. Earlier version that used a bottom-left origin and produced vertically-flipped Row indices. Kept for historical reference only — **do not use** for new DHSVM runs.
-
-*(Note: a true road/stream aspect calculator was never required by the watersheds this toolkit was developed for, since DHSVM road routing is not used in those configurations. The `roadaspect.py` filename in earlier iterations was a documentation/naming error — its actual content was a robust rowcolmap, now properly renamed.)*
-
-### 3. Hydrologic Analysis Tools
-* `plot_mainstem.py`: Automatically identifies the watershed outlet and traces the true physical main stem upstream using DEM elevation routing. Identifies knickpoints, plots longitudinal profiles, and exports detailed `.csv` spatial data.
-
-*(Note: Previous iterations of the pipeline are archived in the `scripts/legacy/` directory for historical reference and methodological transparency).*
+* **Physically Consistent Initial States:** Replaces `MakeModelStateBin` and legacy bash scripts. Safely handles Endianness and parses dynamically computed channel widths to produce physically accurate initial channel water volumes, preventing severe numerical shocks during model spin-up.
+* **Uniform Soil Depth Baselines:** Generates a suite of pixel-aligned uniform soil depth grids for subsurface stormflow sensitivity testing.
+* **Top-left Origin Convention (DHSVM-correct):** The robust rowcolmap uses top-left origin as required by `stream.map.dat`. An earlier bottom-left version is preserved (`qgis/rowcolmap_legacy_bottom_left.py`) but **deprecated** — see [`qgis/README.md`](./qgis/README.md) for details.
+* **Floating-point Parity Across Implementations:** The standalone `rowcolmap` uses an explicit `(y_top - y) / dy` division (matching the QGIS robust version) rather than `rasterio.transform.rowcol()`, ensuring byte-identical Row/Col output even at exact cell-boundary centroids.
 
 ## Output Directory Structure
 
-To keep the workspace clean, the pipeline automatically routes outputs into four distinct directories:
-
-* `/DHSVM_input_binaries/`: Flat binary grids (`dem.bin`, `mask.bin`, `soildepth.bin`, etc.) ready for the `[TERRAIN]` and `[SOILS]` blocks in the `.dhs` file.
+* `/DHSVM_input_binaries/`: Flat binary grids (`dem.bin`, `mask.bin`, `soildepth.bin`, etc.) for the `[TERRAIN]` and `[SOILS]` blocks.
 * `/DHSVM_input_streams/`: Topological routing files (`stream.map.dat`, `stream.network.dat`, `stream.class.dat`).
-* `/modelstate/`: Initial condition files for the `[STATE]` block. The pipeline explicitly generates the following four files (appending `.bin` to grid states to satisfy DHSVM's internal I/O hardcoding):
-  * `Interception.State.[Date].bin` (Float32 binary)
-  * `Snow.State.[Date].bin` (Float32 binary)
-  * `Soil.State.[Date].bin` (Float32 binary)
-  * `Channel.State.[Date]` (ASCII text format, no extension)
-* `/Intermediate_GIS/`: Diagnostic `.tif` and `.shp` files for visualization and debugging in QGIS.
+* `/modelstate/`: Initial condition files for the `[STATE]` block:
+  * `Interception.State.[Date].bin`, `Snow.State.[Date].bin`, `Soil.State.[Date].bin` (Float32 binary)
+  * `Channel.State.[Date]` (ASCII, no extension)
+* `/Intermediate_GIS/`: Diagnostic `.tif` and `.shp` files for QGIS visualization.
 
 ## Usage
 
-Run the scripts inside the QGIS Python Console. Ensure the Processing plugin and GRASS provider are enabled.
+### QGIS workflow (interactive)
 
-1. Execute `prep_dhsvm_inputs.py` to run the complete spatial and state generation pipeline.
-2. Execute `plot_mainstem.py` to validate your slope calculations and visualize the main stem geomorphology. 
+Run the scripts in `qgis/` from the QGIS Python Console. Ensure the Processing plugin and GRASS provider are enabled. Auto-discovery resolves paths from `Reprojected_DEM/elev_clipped.tif` upward.
 
-The scripts utilize an auto-discovery mechanism, so no manual path hardcoding is required as long as your foundational DEM sits within the project directory tree (e.g., `Reprojected_DEM/elev_clipped.tif`).
+### Standalone workflow (CLI / HPC)
+
+```bash
+# Set up the conda environment once
+conda env create -f standalone/environment.yml
+conda activate dhsvm-prep
+
+# Run individual modules
+python standalone/channelclass.py <streamfile.shp> <output_dir>
+python standalone/rowcolmap.py annotate <streamfile.shp> <dem.tif>
+python standalone/plot_mainstem.py <streamfile.shp> <dem.tif> --output-dir <dir>
+```
 
 ---
-**Author:** Y. Song <br>
+
+**Author:** Y. Song
 **Organization:** Duke University
+**Reference physics:** Wigmosta et al. (1994), *Water Resour. Res.* 30(6), 1665–1679
