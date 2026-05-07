@@ -20,7 +20,7 @@
 #   Run natively inside the QGIS Python Console.
 #
 # AUTHOR: Yiyun Song
-# DATE:   2026-04-06
+# DATE:   2026-05-07
 # =====================================================================
 
 import os, time, math
@@ -249,30 +249,56 @@ processing.run("grass7:r.slope.aspect",{
 #  Normalize fields for map.dat #
 # ----------------------------- #
 def _ensure_fields_rowcol_len(layer: QgsVectorLayer):
+    """Add arcid, Shape_Leng, Row, Col fields to a stream line layer.
+
+    NOTE on Row/Col convention (read before changing):
+    The Row/Col fields written here are *advisory only* — populated
+    for QA and visualization in QGIS. They are NOT what DHSVM
+    ultimately reads. DHSVM reads the Row/Col values written into
+    stream.map.dat by `_write_stream_map()`, which interpolates along
+    each segment and bins each interpolation point into a DEM cell.
+
+    Both this function AND `_write_stream_map()` must use the same DEM
+    coordinate convention: TOP-LEFT origin (row 0 = northern edge,
+    row index increases downward). Historically this function used a
+    bottom-left origin, which silently produced vertically-flipped
+    Row values relative to `stream.map.dat`. Fixed in Tier D2
+    (2026-05).
+
+    If you change the row/col convention in the future, change BOTH
+    functions together — otherwise you reintroduce the silent split.
+    """
     layer.startEditing()
-    need = [("arcid",QVariant.Int),("Shape_Leng",QVariant.Double),("Row",QVariant.Int),("Col",QVariant.Int)]
+    need = [("arcid", QVariant.Int), ("Shape_Leng", QVariant.Double),
+            ("Row", QVariant.Int), ("Col", QVariant.Int)]
     names = layer.fields().names()
-    for n,t in need:
-        if n not in names: layer.addAttribute(QgsField(n,t))
+    for n, t in need:
+        if n not in names:
+            layer.addAttribute(QgsField(n, t))
     layer.updateFields()
 
     dem = _raster_layer_for(elev)
-    px,py = abs(dem.rasterUnitsPerPixelX()), abs(dem.rasterUnitsPerPixelY())
-    xmin,ymin = dem.extent().xMinimum(), dem.extent().yMinimum()
+    px, py = abs(dem.rasterUnitsPerPixelX()), abs(dem.rasterUnitsPerPixelY())
+    xmin = dem.extent().xMinimum()
+    ymax = dem.extent().yMaximum()  # top-left origin: row 0 at northern edge
 
     idx_arc = layer.fields().indexFromName("arcid")
     idx_len = layer.fields().indexFromName("Shape_Leng")
     idx_row = layer.fields().indexFromName("Row")
     idx_col = layer.fields().indexFromName("Col")
 
-    i=0
+    i = 0
     for ft in layer.getFeatures():
-        i+=1
-        g=ft.geometry(); L=g.length() if g and not g.isEmpty() else 0.0
-        c=g.centroid().asPoint() if g else QgsPointXY(xmin,ymin)
-        row=int((c.y()-ymin)/py) if py>0 else 0
-        col=int((c.x()-xmin)/px) if px>0 else 0
-        ft[idx_arc]=i; ft[idx_len]=float(L); ft[idx_row]=row; ft[idx_col]=col
+        i += 1
+        g = ft.geometry()
+        L = g.length() if g and not g.isEmpty() else 0.0
+        c = g.centroid().asPoint() if g else QgsPointXY(xmin, ymax)
+        row = int((ymax - c.y()) / py) if py > 0 else 0   # top-left, matches _write_stream_map
+        col = int((c.x() - xmin) / px) if px > 0 else 0
+        ft[idx_arc] = i
+        ft[idx_len] = float(L)
+        ft[idx_row] = row
+        ft[idx_col] = col
         layer.updateFeature(ft)
     layer.commitChanges()
 
