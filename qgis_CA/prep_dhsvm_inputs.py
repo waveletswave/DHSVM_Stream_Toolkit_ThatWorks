@@ -40,7 +40,13 @@ import processing
 #   User-tunable configuration  #
 # ----------------------------- #
 MIN_SRC_CELLS      = 60           # r.stream.extract threshold in number of cells
-NIN_MODE           = "indegree"   # "indegree" or "shreve" for Col(2)
+NIN_MODE           = "propagated"  # "propagated" (dense, recommended), "shreve", or "indegree".
+                                   # DHSVM channel_route_network requires DENSE stream
+                                   # order — it breaks the outer loop on the first empty
+                                   # order. Indegree and Shreve can produce gaps when fake
+                                   # sinks are merged into the true outlet, leaving the
+                                   # outlet segment unrouted (basin outflow stays at 0).
+                                   # See Tier A audit (May 2026).
 BASE_SLOPE_SAMPLES = 12           # samples per line when computing tan(slope)
 SNAP_TOL_LIST      = [0.75, 1.25, 1.75]  
 FA_TOL_MULT        = 1.10         # FA matching tolerance = 1.10 × pixel-diagonal
@@ -472,6 +478,7 @@ def _build_directed_by_FA(vl: QgsVectorLayer, acc_path: str, dem_path: str):
         for s in sinks:
             if s != best_sink: down_map[s] = best_sink; indeg[best_sink] += 1
 
+    # ----- existing Shreve block (keep as-is) -----
     upstream = defaultdict(list)
     for u, v in down_map.items():
         if v != -1: upstream[v].append(u)
@@ -482,6 +489,11 @@ def _build_directed_by_FA(vl: QgsVectorLayer, acc_path: str, dem_path: str):
         memo[u] = 1 if not ups else sum(_shreve(x) for x in ups)
         return memo[u]
     for k in set(list(upstream.keys()) + list(down_map.keys())): _shreve(k)
+
+    # ----- NEW: propagated order (dense, DHSVM-safe) -----
+    # Computed AFTER topo sort below so we can iterate in topological order.
+    # Defined here as a closure so it can be returned alongside indeg/memo.
+    # (propagated_order computed below, after _toposort)
 
     def _toposort(feats_ids, down):
         nbrs = defaultdict(set)
@@ -515,10 +527,18 @@ def _build_directed_by_FA(vl: QgsVectorLayer, acc_path: str, dem_path: str):
         return order
 
     topo_fids = _toposort(list(fid_to_feat.keys()), down_map)
+    
+    # ----- NEW: actual propagated_order computation -----
+    prop_order = {}
+    for fid in topo_fids:  # topological: headwater first
+        ups = upstream.get(fid, [])
+        prop_order[fid] = 1 if not ups else max(prop_order[u] for u in ups) + 1
+    
     new_id = {fid: i+1 for i, fid in enumerate(topo_fids)}
     n_outlets = sum(1 for fid in topo_fids if down_map.get(fid, -1) == -1)
 
-    return fid_to_feat, down_map, indeg, memo, az, topo_fids, new_id, n_outlets
+    return fid_to_feat, down_map, indeg, memo, prop_order, az, topo_fids, new_id, n_outlets
+                                              # ^^^^^^^^^^ NEW return value
 
 def _sample_mean_slope_tan_along_line(geom, slope_raster_path: str, n_samples=BASE_SLOPE_SAMPLES):
     if (geom is None) or geom.isEmpty(): return 0.01
@@ -538,7 +558,10 @@ def _first_existing_field(vl: QgsVectorLayer, candidates):
     return None
 
 def _write_stream_network_FA(vl: QgsVectorLayer, slope_raster_path: str, out_dir: Path, nin_mode=NIN_MODE):
-    fid_to_feat, down_map, indeg_map, shreve_map, az, topo_fids, new_id, n_out = _build_directed_by_FA(vl, flow_acc, elev)
+    # + prop_order
+    fid_to_feat, down_map, indeg_map, shreve_map, prop_order_map, az, topo_fids, new_id, n_out \
+        = _build_directed_by_FA(vl, flow_acc, elev)
+    
     class_field  = _first_existing_field(vl, ["chanclass","class_id","class"])
     length_field = _first_existing_field(vl, ["Shape_Leng","length","len"])
 
@@ -549,10 +572,21 @@ def _write_stream_network_FA(vl: QgsVectorLayer, slope_raster_path: str, out_dir
             length_m = _to_float(ft[length_field]) if length_field else (geom.length() if geom else 0.0)
             slope_tan = _sample_mean_slope_tan_along_line(geom, slope_raster_path)
             class_id = int(ft[class_field]) if class_field and _to_float(ft[class_field]) else 1
-            nin_raw = int(shreve_map.get(fid, 1)) if nin_mode == "shreve" else int(indeg_map.get(fid, 0))
+            
+            # NEW: select order based on NIN_MODE
+            if nin_mode == "propagated":
+                nin_raw = int(prop_order_map.get(fid, 1))
+            elif nin_mode == "shreve":
+                nin_raw = int(shreve_map.get(fid, 1))
+            else:  # "indegree" — kept for diagnostic comparison only; can produce gaps
+                nin_raw = int(indeg_map.get(fid, 0))
             nin = max(1, nin_raw)
-            dwn_fid = down_map.get(fid,-1)
-            dwn_new = -1 if dwn_fid==-1 else int(new_id.get(dwn_fid,-1))
+            
+            dwn_fid = down_map.get(fid, -1)
+            # Tier A1 fix: DHSVM expects 0 (not -1) for outlet segments.
+            # See channel.c::channel_read_network, line 459: `if (outid != 0)`.
+            dwn_new = 0 if dwn_fid == -1 else int(new_id.get(dwn_fid, 0))
+            
             segid = new_id[fid]
             f.write(f"{segid:d} {nin:d} {slope_tan:0.5f} {length_m:0.5f} {class_id:d} {dwn_new:d}\n")
     return fid_to_feat, az, topo_fids, new_id
