@@ -20,7 +20,7 @@
 #   Run natively inside the QGIS Python Console.
 #
 # AUTHOR: Yiyun Song
-# DATE:   2026-05-08
+# DATE:   2026-05-11
 # =====================================================================
 
 import os, time, math
@@ -245,10 +245,10 @@ vl_lines = QgsVectorLayer(vector_path,"streams_live","ogr")
 # ----------------------------- #
 #    Slope raster (DEGREES)     #
 # ----------------------------- #
-print("[step] GRASS r.slope.aspect → calculating slope…")
+print("[step] GRASS r.slope.aspect → calculating slope (degrees)…")
 processing.run("grass7:r.slope.aspect",{
-    'elevation':elev,'slope':stream_slope,'format':1,
-    'GRASS_REGION_PARAMETER':elev,'GRASS_REGION_CELLSIZE_PARAMETER':0
+     'elevation':elev,'slope':stream_slope,'format':0,   # 0=degrees (1=percent)
+      'GRASS_REGION_PARAMETER':elev,'GRASS_REGION_CELLSIZE_PARAMETER':0
 })
 
 # ----------------------------- #
