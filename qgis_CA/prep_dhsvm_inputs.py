@@ -321,7 +321,7 @@ def _sample_mean_slope_deg(geom, slope_raster_path: str, n_samples=BASE_SLOPE_SA
     for i in range(1, n_samples+1):
         d=(i/(n_samples+1.0))*L
         p=geom.interpolate(d).asPoint()
-        ok,val = prov.sample(p,1)
+        val,ok = prov.sample(p,1)
         if ok and val is not None:
             try: vals.append(max(0.0, float(val)))
             except: pass
