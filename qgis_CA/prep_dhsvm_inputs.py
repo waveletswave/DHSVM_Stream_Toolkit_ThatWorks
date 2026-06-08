@@ -20,7 +20,7 @@
 #   Run natively inside the QGIS Python Console.
 #
 # AUTHOR: Yiyun Song
-# DATE:   2026-05-12
+# DATE:   2026-06-08
 # =====================================================================
 
 import os, time, math
@@ -250,6 +250,24 @@ processing.run("grass7:r.slope.aspect",{
      'elevation':elev,'slope':stream_slope,'format':0,   # 0=degrees (1=percent)
       'GRASS_REGION_PARAMETER':elev,'GRASS_REGION_CELLSIZE_PARAMETER':0
 })
+
+# ----------------------------- #
+#  Condition slope: fill NoData  #
+#  (boundary ring + interior     #
+#  void relics) by neighbour     #
+#  interpolation, so the raster  #
+#  is complete before any        #
+#  consumer reads it. Removes the #
+#  slope=0 -> max-depth ring      #
+#  artifact in soildepth.        #
+# ----------------------------- #
+print("[step] Conditioning slope raster (fill edge NoData by neighbour interpolation)…")
+try:
+    spec_sf = importlib.util.spec_from_file_location("slope_fill", str(SCRIPT_DIR/"slope_fill.py"))
+    mod_sf  = importlib.util.module_from_spec(spec_sf); spec_sf.loader.exec_module(mod_sf)
+    mod_sf.fill_slope_nodata(stream_slope, elev)   # overwrites stream_slope.tif in place
+except Exception as e:
+    print(f"[warn] slope conditioning skipped: {e}")
 
 # ----------------------------- #
 #  Normalize fields for map.dat #
