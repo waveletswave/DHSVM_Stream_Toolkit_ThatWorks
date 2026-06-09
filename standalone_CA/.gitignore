@@ -1,0 +1,4 @@
+outputs/
+*.bin
+*.tif
+__pycache__/
