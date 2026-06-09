@@ -1,0 +1,25 @@
+(dhsvm_geo) ys451@dcc-login-02  /work/ys451/dhsvm_ca/standalone_dev/pipeline $ python bins.py
+[bins] reading /work/ys451/dhsvm_ca/standalone_dev/outputs/elev_clipped.tif
+/hpc/group/abmurraylab/ys451/envs/dhsvm_geo/lib/python3.10/site-packages/osgeo/gdal.py:311: FutureWarning: Neither gdal.UseExceptions() nor gdal.DontUseExceptions() has been explicitly called. In GDAL 4.0, exceptions will be enabled by default.
+  warnings.warn(
+[bins] valid pixels: 4334 / 6068
+[bins] wrote dem/mask/soil/veg .bin
+[bins] wrote soildepth_uniform_2.0m.bin
+[bins] wrote soildepth_uniform_2.5m.bin
+[bins] wrote soildepth_uniform_3.0m.bin
+[bins] wrote soildepth_uniform_3.5m.bin
+[bins] wrote soildepth_uniform_4.0m.bin
+(dhsvm_geo) ys451@dcc-login-02  /work/ys451/dhsvm_ca/standalone_dev/pipeline $ python compare_bin.py
+=== bins byte comparison vs qgis_CA ===
+OK dem.bin                          size 24272/24272 identical
+OK mask.bin                         size 6068/6068 identical
+OK soil.bin                         size 6068/6068 identical
+OK veg.bin                          size 6068/6068 identical
+OK soildepth_uniform_2.0m.bin       size 24272/24272 identical
+OK soildepth_uniform_2.5m.bin       size 24272/24272 identical
+OK soildepth_uniform_3.0m.bin       size 24272/24272 identical
+OK soildepth_uniform_3.5m.bin       size 24272/24272 identical
+OK soildepth_uniform_4.0m.bin       size 24272/24272 identical
+
+BINS ALL byte-identical: True
+(dhsvm_geo) ys451@dcc-login-02  /work/ys451/dhsvm_ca/standalone_dev/pipeline $
