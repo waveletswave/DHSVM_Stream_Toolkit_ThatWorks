@@ -1,27 +1,60 @@
-"""Path constants for the standalone DHSVM preprocessing pipeline (CA case, DCC)."""
-# NOTE: paths are hardcoded to the CA case and DCC absolute locations.
-# Parameterization (env vars / config) is deferred until all trivial
-# stages pass; see standalone_CA/docs/validation_log.md "Outstanding".
+"""Path constants for the standalone DHSVM preprocessing pipeline.
+
+Single source of truth for every stage's paths. The three roots (INPUTS, REF,
+OUT) plus the GRASS shim and EPSG are env-overridable, so the same code runs on
+a different case or machine by setting environment variables -- no code edits:
+
+    export DHSVM_INPUTS=/path/to/inputs
+    export DHSVM_REF=/path/to/qgis_reference     # optional, validation only
+    export DHSVM_OUT=/path/to/outputs
+    export DHSVM_GRASS_SHIM=/path/to/grass76_py3.py
+    export DHSVM_EPSG=32617
+    export DHSVM_SRC_DEM=USGS_..._UTM17.tif       # input DEM filename (in INPUTS)
+    export DHSVM_WATERSHED=cabr_watershed_UTM17.shp
+
+Defaults reproduce the CA case on DCC.
+"""
+import os
 from pathlib import Path
 
-# Inputs (persistent group space)
-INPUTS = Path("/hpc/group/abmurraylab/ys451/dhsvm_ca/inputs")
-SRC_DEM = INPUTS / "USGS_1_n36w084_20220725_UTM17.tif"
-WATERSHED = INPUTS / "cabr_watershed_UTM17.shp"
+# ----------------------------- roots (env-overridable) ----------------------
+INPUTS = Path(os.environ.get("DHSVM_INPUTS", "/hpc/group/abmurraylab/ys451/dhsvm_ca/inputs"))
+REF    = Path(os.environ.get("DHSVM_REF",    "/hpc/group/abmurraylab/ys451/dhsvm_ca/qgis_CA_ref"))
+OUT    = Path(os.environ.get("DHSVM_OUT",    "/work/ys451/dhsvm_ca/standalone_dev/outputs"))
+SHIM   = Path(os.environ.get("DHSVM_GRASS_SHIM", "/hpc/group/abmurraylab/ys451/bin/grass76_py3.py"))
+EPSG   = int(os.environ.get("DHSVM_EPSG", "32617"))
 
-# qgis_CA reference outputs, for byte-level validation
-REF = Path("/hpc/group/abmurraylab/ys451/dhsvm_ca/qgis_CA_ref")
-REF_ELEV_CLIPPED = REF / "elev_clipped.tif"
-
-# Standalone outputs (scratch during development)
-OUT = Path("/work/ys451/dhsvm_ca/standalone_dev/outputs")
 OUT.mkdir(parents=True, exist_ok=True)
-ELEV_CLIPPED = OUT / "elev_clipped.tif"
 
-# Target CRS for this case (UTM Zone 17N). Used to re-stamp CRS after GRASS export.
-EPSG = 32617
+# ----------------------------- inputs ---------------------------------------
+SRC_DEM   = INPUTS / os.environ.get("DHSVM_SRC_DEM", "USGS_1_n36w084_20220725_UTM17.tif")
+WATERSHED = INPUTS / os.environ.get("DHSVM_WATERSHED", "cabr_watershed_UTM17.shp")
 
-# Slope stage
-REF_SLOPE = REF / "stream_slope_filled.tif"   # qgis_CA reference (already conditioned)
-SLOPE_RAW = OUT / "slope_raw.tif"             # r.slope.aspect output before fill
-SLOPE_FILLED = OUT / "slope_filled.tif"       # after slope_fill conditioning
+# ----------------------------- output directories ---------------------------
+BIN_DIR     = OUT / "DHSVM_input_binaries"   # all DHSVM grid binaries: dem/mask/soil/veg + soildepth (decision A: unified)
+STATE_DIR   = OUT / "modelstate"             # initial states
+STREAMS_DIR = OUT / "DHSVM_input_streams"    # stream.class/network/map.dat
+
+# ----------------------------- derived raster/vector outputs ----------------
+# clip stage
+ELEV_CLIPPED  = OUT / "elev_clipped.tif"
+# slope stage
+SLOPE_RAW     = OUT / "slope_raw.tif"        # r.slope.aspect output before fill
+SLOPE_FILLED  = OUT / "slope_filled.tif"     # after slope_fill conditioning
+# hydrology stage
+FLOW_ACC      = OUT / "flow_acc.tif"
+FLOW_DIR      = OUT / "flow_dir.tif"
+STREAM_RASTER = OUT / "stream_raster.tif"
+STREAMFILE    = OUT / "streamfile.shp"       # stream vector (geometry only)
+# vector_attrs stage
+STREAMFILE_ATTR = OUT / "streamfile_attr.shp"
+# soildepth stage
+SOILDEPTH_TIF = OUT / "soildepth.tif"        # diagnostic GeoTIFF (bin goes in BIN_DIR)
+
+# ----------------------------- reference (validation only) ------------------
+REF_ELEV_CLIPPED = REF / "elev_clipped.tif"
+REF_SLOPE        = REF / "stream_slope_filled.tif"   # conditioned slope reference
+REF_INTERMED     = REF / "Intermediate_GIS"          # flow_acc/flow_dir/stream_raster/streamfile + soildepth.tif
+REF_BINARIES     = REF / "DHSVM_input_binaries"      # soildepth.bin etc.
+REF_STREAMS      = REF / "DHSVM_input_streams"        # stream.class/network/map.dat + modelstate ref lives under REF/modelstate
+REF_MODELSTATE   = REF / "modelstate"

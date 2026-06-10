@@ -28,14 +28,13 @@ import rasterio
 from shapely.geometry import LineString, MultiLineString
 from pathlib import Path
 
-# ----------------------------- paths (fold into paths.py later) -------------
-OUT_DIR    = Path("/work/ys451/dhsvm_ca/standalone_dev/outputs")
-STREAM_IN  = OUT_DIR / "streamfile.shp"            # hydrology output (geometry only)
-STREAM_OUT = OUT_DIR / "streamfile_attr.shp"       # this stage's output (with attrs)
+from paths import (STREAMFILE, STREAMFILE_ATTR, ELEV_CLIPPED, SLOPE_FILLED, FLOW_ACC)
 
-ELEV_TIF   = OUT_DIR / "elev_clipped.tif"          # DEM: grid origin + cell size
-SLOPE_TIF  = OUT_DIR / "slope_filled.tif"          # filled slope (degrees)
-FACC_TIF   = OUT_DIR / "flow_acc.tif"              # flow accumulation
+STREAM_IN  = STREAMFILE            # hydrology output (geometry only)
+STREAM_OUT = STREAMFILE_ATTR       # this stage's output (with attrs)
+ELEV_TIF   = ELEV_CLIPPED          # DEM: grid origin + cell size
+SLOPE_TIF  = SLOPE_FILLED          # filled slope (degrees)
+FACC_TIF   = FLOW_ACC              # flow accumulation
 
 BASE_SLOPE_SAMPLES = 12                            # prep constant
 
