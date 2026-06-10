@@ -32,9 +32,16 @@ def channelclassfun(streamnet_path,
                     write_header=True,
                     slope_field_candidates=("slope", "slope_deg", "slp_mean", "slp", "slope_mean"),
                     area_field_candidates=("meanmsq", "mean_m2", "acc_mean"),
-                    debug_csv=False):
+                    debug_csv=False,
+                    write_back=True):
     """Classify by contributing area (m2) and slope (converted to tan). Verbatim
-    logic from the QGIS version; geopandas IO."""
+    logic from the QGIS version; geopandas IO.
+
+    write_back=True also writes the per-segment chanclass/Class/hydwidth/hyddepth
+    columns back onto the attribute shapefile (mirrors prep's in-place edit), so
+    the downstream stream.network.dat step can read per-segment class. This is the
+    option-(ii) equivalent of prep editing vl_lines in place.
+    """
 
     gdf = gpd.read_file(str(streamnet_path))
 
@@ -138,6 +145,9 @@ def channelclassfun(streamnet_path,
 
     class_defs, class_counts = {}, {}
     assignments = []
+    seg_chanclass = []   # per-segment, for write-back (mirrors prep ft["chanclass"])
+    seg_width = []
+    seg_depth = []
 
     # --- per-segment classification (verbatim guards) ---
     for idx in range(len(gdf)):
@@ -152,6 +162,10 @@ def channelclassfun(streamnet_path,
         band = slope_band(tan_s)
         abin = area_bin(a_m2)
         cid, w, d = CLASS_TABLE[band][abin]
+
+        seg_chanclass.append(int(cid))
+        seg_width.append(float(w))
+        seg_depth.append(float(d))
 
         class_defs.setdefault(cid, (w, d))
         class_counts[cid] = class_counts.get(cid, 0) + 1
@@ -172,6 +186,17 @@ def channelclassfun(streamnet_path,
     print(f"stream.class.dat written: {out_path}")
     print("Class counts:", {k: class_counts[k] for k in sorted(class_counts)})
     print(f"[info] Slope mode auto-detected as: {slope_mode} (converted to tan for binning)")
+
+    # --- write-back per-segment class columns onto the attr shapefile ---
+    if write_back:
+        gdf["chanclass"] = seg_chanclass
+        gdf["Class"] = seg_chanclass          # mirror, as in the QGIS version
+        gdf["hydwidth"] = seg_width
+        gdf["hyddepth"] = seg_depth
+        gdf.to_file(str(streamnet_path))
+        print(f"[info] wrote per-segment chanclass/Class/hydwidth/hyddepth back to "
+              f"{os.path.basename(str(streamnet_path))}")
+
     return out_path
 
 

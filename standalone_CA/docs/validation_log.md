@@ -170,3 +170,43 @@ every segment maps to class 13. The multi-class area/CLASS_TABLE branches are
 not exercised by CA's (degenerate) data; they would engage on a case with
 positive flow_acc or gentler slopes. Port is verbatim and correct; CA simply
 does not stress it.
+
+## vector I/O sub-step C: directed network -> stream.network.dat + stream.map.dat
+
+Ports _build_directed_by_FA + _write_stream_network_FA + _write_stream_map
+(prep). geopandas/shapely/numpy replace QGIS; spatial index replaced by an exact
+brute-force k-NN over up-endpoints (shapely STRtree.query_nearest lacks k= in
+2.1 and would return a single candidate -- a silent linking bug avoided).
+channelclass_standalone.py extended (write_back=True) to write per-segment
+chanclass/Class/hydwidth/hyddepth onto streamfile_attr.shp, the option-(ii)
+equivalent of prep's in-place edit, so this stage can read per-segment class.
+
+Verdict: PASS as a DHSVM-valid topology. NOT byte-identical to the qgis_CA
+reference, and deliberately not aligned to it. Confirmed against the four
+requirements DHSVM actually imposes:
+- single outlet, and it is the same physical line as the reference outlet
+  (segment 41, len 124.29428, slope 0.20258);
+- every segment reaches the outlet (no cycles, no dangling);
+- propagated order is DENSE (std nin distribution spans 1..7 with no gap) --
+  the Tier A requirement so channel_route_network does not break on an empty
+  order;
+- segment set identical to the reference ((length,slope) multiset equal).
+
+Two of 41 down-pointers differ from the reference (and the order/hop depth
+distribution differs by one bin as a result). Root cause, established by
+isolation: at a junction, two upstream endpoints are COINCIDENT with the
+current segment's downstream endpoint (d=0). The downstream link is then
+geometrically undefined; _best_neighbor's distance criterion cannot
+discriminate and any tie-break is arbitrary. The reference's choice comes from
+QGIS's R-tree internal order and has no hydrologic ground truth. We do NOT
+reverse-engineer it: aligning to QGIS would reproduce an arbitrary pick with no
+scientific basis. The standalone's k-NN is distance-sorted, so on the d=0 tie it
+takes the straighter (lower-deflection) neighbour, which is consistent with flow
+momentum and is at least as defensible as the reference's (steeper-deflection)
+pick. Both yield valid networks; the standalone meets all four DHSVM
+requirements above. Byte-identity is therefore not the acceptance criterion for
+this stage -- it would mean reproducing an undefined tie's arbitrary resolution.
+
+This is the inventory section-6 tolerance case, applied at the topology level:
+algorithms identical where reproducible; at an inherently undefined point, a
+defensible deterministic choice that satisfies the downstream model.
