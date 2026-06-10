@@ -87,3 +87,32 @@ those stream files are ported and pass the byte gate.
 Every grid-state array is spatially uniform, so output bytes are fixed by
 (array count, write order, dtype, constants) alone; identical by construction
 given matching grid dims. Reference: qgis_CA modelstate, regenerated 2026-06-08.
+
+## hydrology core (flow_acc / flow_dir / stream_raster + stream vector)
+
+Reproduces the three grass7: processing.run calls in prep_dhsvm_inputs.py:
+r.watershed -> r.stream.extract -> r.to.vect, chained in one GRASS location
+(option i), run through the grass76_py3 shim. Region locked g.region
+raster=elev_in (74x82). r.out.gdal exports CRS-stamped to EPSG:32617 by
+hydrology.py (r.out.gdal cannot write CRS on this install).
+
+Parameter parity vs prep, three corrections found and confirmed empirically:
+- r.watershed: MFD default, no -a. flow_acc is all-negative on CA (-3387.5..-1),
+  the expected edge/underestimate marking; adding -a would have flipped it.
+- r.stream.extract: prep's '-m':True is not a valid flag for this module (it is
+  an r.watershed flag); the QGIS wrapper silently dropped it, so we drop it too.
+  prep's 'direction':flow_dir is an OUTPUT param, not an input; not fed here.
+  Real input set is elevation + accumulation, matching what QGIS actually ran.
+- r.to.vect: CA's r.stream.extract stream_vector came out empty (prep fell back
+  to _force_lines_from_raster); reproduced with type=line, no -s.
+
+Validation vs qgis_CA_ref/Intermediate_GIS (CA case, 74x82):
+- flow_acc.tif (DCELL)  shape/transform/CRS match, max abs diff 0.0
+- flow_dir.tif (CELL)   shape/transform/CRS match, max abs diff 0.0
+- stream_raster.tif     shape/transform/CRS match, max abs diff 0.0
+- streamfile.shp        41 line features (matches ref), extent identical to 6 dp
+
+Note: this validates the hydrology rasters and the fallback stream geometry.
+The stream vector attribute table / topology / channel classification
+(channelclass, directed network, propagated order) is the #6 vector I/O layer,
+which builds on this geometry.
