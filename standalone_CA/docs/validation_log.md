@@ -116,3 +116,31 @@ Note: this validates the hydrology rasters and the fallback stream geometry.
 The stream vector attribute table / topology / channel classification
 (channelclass, directed network, propagated order) is the #6 vector I/O layer,
 which builds on this geometry.
+
+## soildepth (soildepth.bin + soildepth.tif)
+
+Port of soildepthscript.py. PNNL weighting formula and all constants copied
+verbatim; only path resolution and the run guard changed. Inputs: elev_clipped
+(clip), slope_filled (slope stage, FILLED -- prep feeds the in-place conditioned
+stream_slope, so the standalone must feed the filled slope too), flow_acc
+(hydrology). CA case, 74x82, 4334 valid / 1734 nodata.
+
+Verdict: PASS by data-equivalence, NOT byte-identity. soildepth.bin differs from
+the qgis_CA reference in 412 of 6068 cells, max abs diff 4.768e-07 (= 1 float32
+ULP at depth magnitude ~2-4 m). soildepth.tif shows the same max diff.
+
+Isolation confirms the residual is environment-level float rounding, not an
+input or formula error:
+- filled slope ref-vs-standalone: 0 cells differ, max 0.0 (inputs bit-identical;
+  elev and flow_acc already validated zero-diff upstream).
+- recompute soildepth from the REFERENCE inputs vs the reference bin still
+  differs in 412 cells, max 4.768e-07, 393 of them interior (not boundary).
+  Same inputs + verbatim formula -> 1-ULP diff means the power terms
+  ((x)**0.25, (x)**0.75) round differently under the DCC numpy/libm than under
+  the QGIS environment that produced the reference. float32 is not bit-
+  reproducible across libm implementations.
+
+This is the inventory section-6 tolerance case (algorithms identical -> byte-
+for-byte where reproducible; otherwise within tolerance and documented).
+Tolerance here is 1 float32 ULP; physically ~5e-7 m on a 6 m depth field,
+no effect on DHSVM behaviour.
