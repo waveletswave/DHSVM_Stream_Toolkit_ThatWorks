@@ -9,15 +9,14 @@
 #
 # This wrapper:
 #   1. runs the GRASS chain via the shim (the .sh does the GRASS work),
-#   2. stamps EPSG:32617 back onto the exported GeoTIFFs with rasterio in
-#      r+ mode -- r.out.gdal cannot write the CRS tag on this install
-#      (gcs.csv missing), exactly as in the slope stage.
+#   2. stamps EPSG back onto the exported GeoTIFFs with rasterio in r+ mode --
+#      r.out.gdal cannot write the CRS tag on this install (gcs.csv missing),
+#      exactly as in the slope stage.
 #
-# Paths use a local block for now; fold into paths.py in the parameterization
-# pass (step 9). DEM_TIF is the clipped DEM from the clip stage; it drives the
-# region and the 74x82 grid.
+# Paths via paths.py. DEM_TIF is the clipped DEM from the clip stage; it drives
+# the region and the 74x82 grid. The GRASS shim path is passed to the .sh.
 #
-# Validation (separate, against qgis_CA_ref/Intermediate_GIS):
+# Validation (separate, against REF_INTERMED):
 #   flow_acc.tif / flow_dir.tif / stream_raster.tif  -> raster data-equivalence
 #   streamfile.shp (41 line features)                -> feature count + geometry
 # =====================================================================
@@ -27,15 +26,14 @@ from pathlib import Path
 from rasterio.crs import CRS
 import rasterio
 
-# ----------------------------- paths (fold into paths.py later) -------------
-OUT_DIR  = Path("/work/ys451/dhsvm_ca/standalone_dev/outputs")
-DEM_TIF  = OUT_DIR / "elev_clipped.tif"          # from the clip stage
+from paths import ELEV_CLIPPED, OUT, EPSG, FLOW_ACC, FLOW_DIR, STREAM_RASTER
+
+DEM_TIF  = ELEV_CLIPPED
+OUT_DIR  = OUT
 HYDRO_SH = Path(__file__).resolve().parent / "run_hydrology_grass.sh"
 
-EPSG = 32617
-
 # GeoTIFF exports that need a CRS stamp (vector shp carries its own .prj).
-RASTER_OUTPUTS = ["flow_acc.tif", "flow_dir.tif", "stream_raster.tif"]
+RASTER_OUTPUTS = [FLOW_ACC, FLOW_DIR, STREAM_RASTER]
 
 
 def run_grass_chain():
@@ -43,6 +41,9 @@ def run_grass_chain():
         raise FileNotFoundError(f"[ERROR] clipped DEM not found: {DEM_TIF}")
     print(f"[step] GRASS hydrology chain (r.watershed -> r.stream.extract -> r.to.vect)")
     print(f"       DEM={DEM_TIF.name}  out={OUT_DIR}")
+    # NOTE: run_hydrology_grass.sh still hardcodes the GRASS shim path internally.
+    # Parameterizing the .sh (read shim from an env var / arg) is a separate
+    # follow-up; the .sh contract here remains (dem_tif, out_dir).
     subprocess.run(
         ["bash", str(HYDRO_SH), str(DEM_TIF), str(OUT_DIR)],
         check=True,
@@ -52,17 +53,16 @@ def run_grass_chain():
 def stamp_crs():
     """r.out.gdal leaves crs=None on this install; rewrite the header only."""
     crs = CRS.from_epsg(EPSG)
-    for name in RASTER_OUTPUTS:
-        p = OUT_DIR / name
+    for p in RASTER_OUTPUTS:
         if not p.exists():
-            print(f"  [warn] missing export, skip CRS stamp: {name}")
+            print(f"  [warn] missing export, skip CRS stamp: {p.name}")
             continue
         with rasterio.open(p, "r+") as s:
             if s.crs is None:
                 s.crs = crs
-                print(f"  -> stamped EPSG:{EPSG} on {name}")
+                print(f"  -> stamped EPSG:{EPSG} on {p.name}")
             else:
-                print(f"  -> {name} already has CRS {s.crs}, left as is")
+                print(f"  -> {p.name} already has CRS {s.crs}, left as is")
 
 
 def run():

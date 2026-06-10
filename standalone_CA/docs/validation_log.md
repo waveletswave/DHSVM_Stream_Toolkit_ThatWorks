@@ -210,3 +210,44 @@ this stage -- it would mean reproducing an undefined tie's arbitrary resolution.
 This is the inventory section-6 tolerance case, applied at the topology level:
 algorithms identical where reproducible; at an inherently undefined point, a
 defensible deterministic choice that satisfies the downstream model.
+
+## Path parameterization (rebuild step 9) + layout unification
+
+All seven stages now derive paths from a single source of truth, paths.py, with
+env-overridable roots (DHSVM_INPUTS / DHSVM_REF / DHSVM_OUT / DHSVM_GRASS_SHIM /
+DHSVM_EPSG / DHSVM_SRC_DEM / DHSVM_WATERSHED); defaults reproduce the CA case on
+DCC. clip.py and slope.py already imported paths.py and were unchanged. The other
+five stages plus bins.py had local hardcoded path blocks; these were replaced by
+paths.py imports with no change to any stage logic. No stage file now contains an
+absolute /work or /hpc path; the defaults live only in paths.py.
+
+Two deliberate layout changes, validated:
+
+Decision A -- unify base-map binaries into DHSVM_input_binaries. bins.py
+previously wrote dem/mask/soil/veg + soildepth_uniform_*.bin to OUT/bins;
+soildepth.bin went to OUT/DHSVM_input_binaries. They now share
+DHSVM_input_binaries, the single directory DHSVM reads all grid binaries from.
+Confirmed: the two sets coexist with no filename collision, and dem/mask/soil/
+veg remain byte-identical to the reference (content unchanged, only directory
+moved). soildepth.bin unchanged (still the pre-existing 1-ULP float
+data-equivalence, size 24272).
+
+Decision B -- channel state reads the standalone stream files. states.py
+previously read stream.class/network.dat from the qgis_CA reference (the vector
+stage was not yet ported). It now reads OUT/DHSVM_input_streams, the standalone
+vector output. Consequence: grid states (Interception/Snow/Soil) are unchanged
+and byte-identical (DEM dims + constants only; sizes 121360/194176/242720), but
+Channel.State now reflects the standalone stream network and is NOT compared to
+the reference Channel.State. This is correct: the channel state must be
+consistent with the stream network actually used, and the standalone network
+differs from the reference at two d=0 tie links (sub-step C). Run order is now
+hydrology -> vector -> states.
+
+Regression check: re-ran bins/soildepth/vector-chain/states after the refactor.
+Every byte-identical output stayed byte-identical; soildepth's data-equivalence
+diff was unchanged; the two intended changes (bins directory, Channel.State
+source) behaved as designed. Pure refactor, no numerical change.
+
+Note: run_hydrology_grass.sh still hardcodes the GRASS shim path internally;
+parameterizing the .sh (read shim from env/arg) is a separate follow-up and does
+not affect the Python path layer.

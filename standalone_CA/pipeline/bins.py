@@ -11,6 +11,9 @@ Logic mirrors the qgis_CA script exactly; only paths differ. soil.bin and
 veg.bin here are the uniform placeholders (type 1 inside basin) that the qgis_CA
 base-map script writes; the per-class veg_bs binaries come from the veg-class
 scripts, a separate stage.
+
+Output goes to BIN_DIR (DHSVM_input_binaries), the single directory DHSVM reads
+all grid binaries from -- shared with soildepth.bin (decision A).
 """
 import sys
 sys.path.insert(0, ".")
@@ -18,13 +21,12 @@ sys.path.insert(0, ".")
 import numpy as np
 from osgeo import gdal
 
-from paths import ELEV_CLIPPED, OUT
+from paths import ELEV_CLIPPED, BIN_DIR
 
 DHSVM_NODATA = -9999.0
 UNIFORM_SOIL_DEPTHS = [2.0, 2.5, 3.0, 3.5, 4.0]
 
-BIN_OUT = OUT / "bins"
-BIN_OUT.mkdir(parents=True, exist_ok=True)
+BIN_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def generate_basemaps():
@@ -34,7 +36,7 @@ def generate_basemaps():
     dem_arr = band.ReadAsArray().astype(np.float32)
     dem_nd = band.GetNoDataValue()
 
-    # Master valid mask from DEM nodata — identical logic to qgis_CA.
+    # Master valid mask from DEM nodata -- identical logic to qgis_CA.
     valid_mask = (dem_arr != dem_nd) & (~np.isnan(dem_arr))
     print(f"[bins] valid pixels: {int(valid_mask.sum())} / {dem_arr.size}")
 
@@ -50,17 +52,17 @@ def generate_basemaps():
     veg_out = np.zeros(dem_arr.shape, dtype=np.int8)
     veg_out[valid_mask] = 1
 
-    dem_out.tofile(BIN_OUT / "dem.bin")
-    mask_out.tofile(BIN_OUT / "mask.bin")
-    soil_out.tofile(BIN_OUT / "soil.bin")
-    veg_out.tofile(BIN_OUT / "veg.bin")
+    dem_out.tofile(BIN_DIR / "dem.bin")
+    mask_out.tofile(BIN_DIR / "mask.bin")
+    soil_out.tofile(BIN_DIR / "soil.bin")
+    veg_out.tofile(BIN_DIR / "veg.bin")
     print("[bins] wrote dem/mask/soil/veg .bin")
 
     for depth in UNIFORM_SOIL_DEPTHS:
         depth_out = np.full(dem_arr.shape, DHSVM_NODATA, dtype=np.float32)
         depth_out[valid_mask] = depth
         fn = f"soildepth_uniform_{depth:.1f}m.bin"
-        depth_out.tofile(BIN_OUT / fn)
+        depth_out.tofile(BIN_DIR / fn)
         print(f"[bins] wrote {fn}")
 
     ds = None

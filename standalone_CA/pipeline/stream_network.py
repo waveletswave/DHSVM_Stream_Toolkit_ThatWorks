@@ -35,14 +35,17 @@ import geopandas as gpd
 from shapely.geometry import Point, LineString, MultiLineString
 from osgeo import gdal
 
-# ----------------------------- paths (fold into paths.py later) -------------
-OUT_DIR     = Path("/work/ys451/dhsvm_ca/standalone_dev/outputs")
-STREAM_IN   = OUT_DIR / "streamfile_attr.shp"          # attrs + chanclass written back
-STREAMS_OUT = OUT_DIR / "DHSVM_input_streams"
+import geopandas as gpd
+from shapely.geometry import Point, LineString, MultiLineString
+from osgeo import gdal
 
-ELEV_TIF    = OUT_DIR / "elev_clipped.tif"
-SLOPE_TIF   = OUT_DIR / "slope_filled.tif"
-FACC_TIF    = OUT_DIR / "flow_acc.tif"
+from paths import (STREAMFILE_ATTR, STREAMS_DIR, ELEV_CLIPPED, SLOPE_FILLED, FLOW_ACC)
+
+STREAM_IN   = STREAMFILE_ATTR          # attrs + chanclass written back
+STREAMS_OUT = STREAMS_DIR
+ELEV_TIF    = ELEV_CLIPPED
+SLOPE_TIF   = SLOPE_FILLED
+FACC_TIF    = FLOW_ACC
 
 # verbatim prep constants
 NIN_MODE           = "propagated"

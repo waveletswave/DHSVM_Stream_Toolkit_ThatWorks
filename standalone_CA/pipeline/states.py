@@ -5,39 +5,34 @@
 # Stage: initial states (grid + channel). Pure NumPy + GDAL.
 # Ports MakeModelStateBin.c / MakeChannelState.sh, same as the qgis_CA version.
 #
-# This is a byte-parity port. Only two things changed from the original:
-#   1. path resolution (central block below; fold into paths.py in the
-#      parameterization pass, step 9 of the rebuild inventory),
-#   2. run-on-import -> run() + __main__ guard.
+# This is a byte-parity port for the GRID states. Only changed from the
+# original: path resolution (now via paths.py) and run-on-import -> run().
 # The grid-state write logic and the channel-state parsing/format are copied
-# verbatim, so any byte diff is a path/dims issue, never a logic change.
+# verbatim.
 #
-# Parity argument: every state array is spatially uniform, so the output bytes
-# are fixed by (array count, write order, dtype, constant values) alone.
-# Ordering within an array (C vs F) is moot for a uniform array. All four are
-# copied verbatim from the qgis_CA script, so the binaries are byte-identical
-# to the qgis_CA reference by construction, given the same grid dims.
+# Grid-state parity: every state array is spatially uniform, so the output
+# bytes are fixed by (array count, write order, dtype, constant values) alone.
+# All four are copied verbatim, so the grid binaries are byte-identical to the
+# qgis_CA reference given the same grid dims.
+#
+# Channel state now reads the STANDALONE stream files (STREAMS_DIR), produced
+# by the hydrology + vector stages (decision B), not the qgis_CA reference.
+# Because the standalone stream network differs from the reference at two d=0
+# tie links (see validation_log sub-step C), Channel.State is self-consistent
+# with the standalone network and is NOT expected to be byte-identical to the
+# qgis_CA Channel.State -- that is correct: the channel state must match the
+# stream network actually used. Run order: hydrology -> vector -> states.
 # =====================================================================
 
 import numpy as np
-from pathlib import Path
 from osgeo import gdal
 
-# ==============================================================
-# Paths  (local for now; fold into paths.py in the parameterization pass)
-# ==============================================================
-# Standalone CA / DCC layout. DEM_TIF dims drive the grid; the stream files
-# feed the channel state. The stream files come from the hydrology + vector
-# stages, which are not ported yet, so they point at the qgis_CA reference
-# for now. elev_clipped.tif from the standalone clip stage is byte-validated
-# identical to the reference, so the grid dims match either way.
-OUT_DIR      = Path("/work/ys451/dhsvm_ca/standalone_dev/outputs")
-REF_STREAMS  = Path("/hpc/group/abmurraylab/ys451/dhsvm_ca/qgis_CA_ref/DHSVM_input_streams")
+from paths import ELEV_CLIPPED, STREAMS_DIR, STATE_DIR
 
-DEM_TIF      = OUT_DIR / "elev_clipped.tif"        # from the clip stage
-CLASS_FILE   = REF_STREAMS / "stream.class.dat"    # hydrology output (ref until ported)
-NETWORK_FILE = REF_STREAMS / "stream.network.dat"
-STATE_DIR    = OUT_DIR / "modelstate"
+# stream files now come from the standalone vector stage (decision B)
+DEM_TIF      = ELEV_CLIPPED
+CLASS_FILE   = STREAMS_DIR / "stream.class.dat"
+NETWORK_FILE = STREAMS_DIR / "stream.network.dat"
 
 # ==============================================================
 # State config  (copied verbatim from generate_dhsvm_states.py)

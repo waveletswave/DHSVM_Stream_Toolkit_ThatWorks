@@ -7,40 +7,34 @@
 # DHSVM flat binary (soildepth.bin) plus a diagnostic GeoTIFF (soildepth.tif).
 #
 # Byte-parity port. The PNNL parameter block and the generate_soildepth math
-# are copied verbatim from soildepthscript.py. Only changed:
-#   1. path resolution (local block below; fold into paths.py in step 9),
-#   2. the run-on-import guard -> run().
+# are copied verbatim from soildepthscript.py. Only changed: path resolution
+# (now via paths.py) and the run-on-import guard -> run().
 #
 # IMPORTANT (slope input): prep_dhsvm_inputs.py passes `stream_slope` to
 # generate_soildepth, but slope_fill ran earlier and overwrote stream_slope.tif
 # in place, so the file soildepth actually reads is the FILLED slope. The
-# standalone must feed the filled slope too (the slope stage output), or the
-# 318 boundary cells slope_fill repaired would diverge -- the exact slope=0 ->
-# max-depth ring artifact Tier B fixed. SLOPE_TIF below points at the filled raster.
+# standalone feeds SLOPE_FILLED (the slope stage output), or the 318 boundary
+# cells slope_fill repaired would diverge -- the exact slope=0 -> max-depth ring
+# artifact Tier B fixed.
 #
-# Inputs are all validated zero-diff stage outputs:
-#   elev  -> clip stage (elev_clipped.tif)
-#   slope -> slope stage (filled)
-#   facc  -> hydrology stage (flow_acc.tif)
-# So given matching inputs and the verbatim formula, the outputs match the
-# qgis_CA reference by construction.
+# Inputs are all validated stage outputs:
+#   elev  -> clip stage (ELEV_CLIPPED)
+#   slope -> slope stage (SLOPE_FILLED)
+#   facc  -> hydrology stage (FLOW_ACC)
+# soildepth.bin goes in BIN_DIR (shared with the base-map binaries, decision A).
 # =====================================================================
 
 import os
 import numpy as np
 from osgeo import gdal
-from pathlib import Path
 
-# ----------------------------- paths (fold into paths.py later) -------------
-OUT_DIR  = Path("/work/ys451/dhsvm_ca/standalone_dev/outputs")
-BIN_DIR  = OUT_DIR / "DHSVM_input_binaries"
+from paths import ELEV_CLIPPED, SLOPE_FILLED, FLOW_ACC, BIN_DIR, SOILDEPTH_TIF
 
-ELEV_TIF  = OUT_DIR / "elev_clipped.tif"          # clip stage
-SLOPE_TIF = OUT_DIR / "slope_filled.tif"          # slope stage (FILLED -- see header)
-FACC_TIF  = OUT_DIR / "flow_acc.tif"              # hydrology stage
-
-OUT_BIN   = BIN_DIR / "soildepth.bin"             # DHSVM input
-OUT_TIF   = OUT_DIR / "soildepth.tif"             # diagnostic
+ELEV_TIF  = ELEV_CLIPPED
+SLOPE_TIF = SLOPE_FILLED          # FILLED -- see header
+FACC_TIF  = FLOW_ACC
+OUT_BIN   = BIN_DIR / "soildepth.bin"
+OUT_TIF   = SOILDEPTH_TIF
 
 # =====================================================================
 # PNNL Soil Depth Parameters  (copied verbatim from soildepthscript.py)

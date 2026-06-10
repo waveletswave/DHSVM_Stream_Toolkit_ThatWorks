@@ -19,9 +19,10 @@ import statistics
 import geopandas as gpd
 from pathlib import Path
 
-OUT_DIR    = Path("/work/ys451/dhsvm_ca/standalone_dev/outputs")
-STREAM_IN  = OUT_DIR / "streamfile_attr.shp"          # from vector_attrs.py
-STREAMS_OUT_DIR = OUT_DIR / "DHSVM_input_streams"     # where stream.class.dat lands
+from paths import STREAMFILE_ATTR, STREAMS_DIR
+
+STREAM_IN  = STREAMFILE_ATTR          # from vector_attrs.py
+STREAMS_OUT_DIR = STREAMS_DIR          # where stream.class.dat lands
 
 
 def channelclassfun(streamnet_path,
