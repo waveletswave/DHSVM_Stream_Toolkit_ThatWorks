@@ -251,3 +251,40 @@ source) behaved as designed. Pure refactor, no numerical change.
 Note: run_hydrology_grass.sh still hardcodes the GRASS shim path internally;
 parameterizing the .sh (read shim from env/arg) is a separate follow-up and does
 not affect the Python path layer.
+
+## End-to-end orchestration: run_pipeline.sh
+
+One command drives the full pipeline: source DEM + watershed -> complete DHSVM
+input set. Shell orchestrator (set -euo pipefail), running each stage in
+dependency order with a fail-fast existence check on every stage's key output:
+
+  clip -> slope(GRASS r.slope.aspect) -> slope(py: CRS stamp+fill+validate)
+  -> bins -> hydrology(py runs the GRASS chain + CRS stamp) -> soildepth
+  -> vector_attrs -> channelclass(+chanclass write-back) -> stream_network
+  -> states
+
+states runs last (decision B: channel state reads the standalone stream files).
+Paths are read from paths.py (the script does not redefine them), so checks and
+stages agree. The two harmless GRASS messages on this install (gcs.csv missing ->
+r.out.gdal cannot write the CRS tag, handled by the Python CRS stamp; and
+SetColorTable unsupported on Float32) are non-fatal; the modules exit 0 and the
+outputs are correct.
+
+Verified by a from-scratch run (outputs/ emptied first, so every intermediate is
+freshly generated -- no stale-file luck):
+- slope vs reference: byte-identical, max abs diff 0.0;
+- base maps (dem/mask/soil/veg) byte-identical to reference;
+- soildepth.bin unchanged 1-ULP data-equivalence (size 24272);
+- stream.class.dat identical; network/map 41/277 lines;
+- grid states sizes unchanged (121360/194176/242720);
+- the full DHSVM input set is produced (DHSVM_input_binaries/,
+  DHSVM_input_streams/, modelstate/).
+A file-by-file cmp of the from-scratch run against the prior step-by-step run
+matched on every checked output (binaries, stream files, grid + channel state):
+the one-command run is byte-for-byte equal to running the stages by hand.
+
+Follow-up: run_slope_grass.sh hardcodes its paths and takes no args;
+run_hydrology_grass.sh hardcodes the shim. Parameterizing the two GRASS .sh
+(read paths/shim from env or args) would close the last gap so a case/machine
+change needs only the DHSVM_* env vars. The Python layer is already fully
+parameterized.
