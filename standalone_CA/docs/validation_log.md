@@ -67,3 +67,23 @@ Result: PASS (byte-identical, all nine files).
 - Hydrology core (r.watershed / r.stream.extract / r.to.vect): highest-risk stage, not started; needs the full processing.run parameter dicts from prep_dhsvm_inputs.py.
 - Vector I/O layer (channelclass, network/order, stream.*.dat): after hydrology.
 - paths.py is hardcoded to CA/DCC absolute paths; parameterization deferred until all trivial stages pass, then done in one pass before merge.
+
+## states (modelstate: Interception / Snow / Soil / Channel)
+
+Port of generate_dhsvm_states.py. Byte-parity port: only path resolution and the
+run-on-import to run() guard changed; grid-state writes and channel-state
+parsing/format copied verbatim. CA case, NY=74 NX=82 (6068 cells).
+
+Grid binaries byte-identical to the qgis_CA reference:
+- Interception.State.01.01.2016.00.00.00.bin  121360 B (5 x 6068 x 4)  identical
+- Snow.State.01.01.2016.00.00.00.bin          194176 B (8 x 6068 x 4)  identical
+- Soil.State.01.01.2016.00.00.00.bin          242720 B (10 x 6068 x 4) identical
+
+Channel.State.01.01.2016.00.00.00 (text) identical via diff. Channel state reads
+the qgis_CA reference stream files (stream.class.dat / stream.network.dat); this
+validates the channel-state logic. It will track the standalone hydrology once
+those stream files are ported and pass the byte gate.
+
+Every grid-state array is spatially uniform, so output bytes are fixed by
+(array count, write order, dtype, constants) alone; identical by construction
+given matching grid dims. Reference: qgis_CA modelstate, regenerated 2026-06-08.
