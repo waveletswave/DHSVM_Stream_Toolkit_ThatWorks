@@ -144,3 +144,29 @@ This is the inventory section-6 tolerance case (algorithms identical -> byte-
 for-byte where reproducible; otherwise within tolerance and documented).
 Tolerance here is 1 float32 ULP; physically ~5e-7 m on a 6 m depth field,
 no effect on DHSVM behaviour.
+
+## vector I/O sub-step B: attributes + channelclass -> stream.class.dat
+
+Option (ii) chained: streamfile.shp (geometry, hydrology) -> vector_attrs.py
+writes streamfile_attr.shp (+arcid/Shape_Leng/Row/Col/slope_deg/meanmsq) ->
+channelclass_standalone.py writes stream.class.dat. geopandas/shapely/rasterio
+replace QgsVectorLayer/QgsGeometry/provider.sample; sampling semantics copied
+verbatim from prep (slope_deg: 12 samples, mean; meanmsq: 15 samples, >0 ->
+midpoint value, else cell_area; Row/Col top-left origin per Tier D2). Raster
+sampling via InvGeoTransform + floor, verified to match provider.sample's
+pixel-containing-point convention.
+
+stream.class.dat byte-IDENTICAL to the qgis_CA reference:
+  #ID W  D   n    inf
+  13   0.5 0.100 0.0450 0.0
+
+Note on why this is a single class: meanmsq is 792.9 for all 41 segments
+(= cell_area, 28.158^2). The meanmsq sampler keeps only flow_acc values > 0,
+but flow_acc is all-negative on CA (edge/underestimate marking, see hydrology),
+so every segment's sample set is empty and falls back to cell_area. This
+faithfully reproduces prep's behaviour on CA. With area degenerate to a constant
+(< 1e6, area_bin 0) and slope all steep (smax 34.9 deg -> tan band "steep"),
+every segment maps to class 13. The multi-class area/CLASS_TABLE branches are
+not exercised by CA's (degenerate) data; they would engage on a case with
+positive flow_acc or gentler slopes. Port is verbatim and correct; CA simply
+does not stress it.
