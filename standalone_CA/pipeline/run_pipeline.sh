@@ -21,14 +21,14 @@
 #   7. states          modelstate/{Interception,Snow,Soil}.State... + Channel.State...
 #
 # Paths come from paths.py (env-overridable: DHSVM_INPUTS/REF/OUT/...). This
-# script does NOT redefine paths; it reads OUT from paths.py so the checks and
-# the stages agree. To retarget a case/machine, set the DHSVM_* env vars before
-# running (note: the two GRASS .sh files still hardcode some paths -- see the
-# .sh parameterization follow-up).
+# script does NOT redefine paths; it reads them from paths.py so the checks and
+# the stages agree, and passes the slope stage's DEM/out/shim to the GRASS .sh.
+# Both GRASS .sh now take their paths and shim as args, so the DHSVM_* env vars
+# retarget the whole pipeline (Python and GRASS) end to end.
 #
 # Usage:
 #   bash run_pipeline.sh
-#   DHSVM_OUT=/path/to/out bash run_pipeline.sh    # (Python layer only; see note)
+#   DHSVM_OUT=/path/to/out bash run_pipeline.sh    # retargets the whole run
 # =====================================================================
 set -euo pipefail
 
@@ -41,6 +41,10 @@ BIN_DIR="$(python3 -c 'import paths; print(paths.BIN_DIR)')"
 STREAMS_DIR="$(python3 -c 'import paths; print(paths.STREAMS_DIR)')"
 STATE_DIR="$(python3 -c 'import paths; print(paths.STATE_DIR)')"
 SLOPE_SH="$HERE/run_slope_grass.sh"
+# Args for the GRASS slope stage, resolved from paths.py (the same single source).
+SLOPE_DEM="$(python3 -c 'import paths; print(paths.ELEV_CLIPPED)')"
+SLOPE_RAW_OUT="$(python3 -c 'import paths; print(paths.SLOPE_RAW)')"
+GRASS_SHIM="$(python3 -c 'import paths; print(paths.SHIM)')"
 
 echo "=========================================================="
 echo "  STANDALONE DHSVM PREPROCESSING PIPELINE"
@@ -63,7 +67,7 @@ need "$OUT/elev_clipped.tif" "clip"
 
 # ---------------------------------------------------------------- 2. slope
 step 2 "slope (GRASS r.slope.aspect)"
-bash "$SLOPE_SH"
+bash "$SLOPE_SH" "$SLOPE_DEM" "$SLOPE_RAW_OUT" "$GRASS_SHIM"
 need "$OUT/slope_raw.tif" "slope GRASS"
 step 2 "slope (CRS stamp + fill + validate)"
 python3 slope.py

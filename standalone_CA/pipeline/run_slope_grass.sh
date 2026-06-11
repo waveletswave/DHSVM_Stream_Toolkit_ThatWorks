@@ -4,12 +4,14 @@
 # Region is locked to the clipped DEM so the output lands on the same 74x82
 # grid as the qgis_CA reference. Run through the py3 shim. CRS stamping and
 # slope_fill conditioning happen afterward in slope.py.
+# Usage:  bash run_slope_grass.sh <clipped_dem.tif> <slope_raw_out.tif> <shim.py>
 set -euo pipefail
 
-GRASS="python /hpc/group/abmurraylab/ys451/bin/grass76_py3.py"
-CLIPPED=/work/ys451/dhsvm_ca/standalone_dev/outputs/elev_clipped.tif
-SLOPE_RAW=/work/ys451/dhsvm_ca/standalone_dev/outputs/slope_raw.tif
-LOC=/work/ys451/dhsvm_ca/grass/gloc_slope
+CLIPPED="$1"        # clipped DEM (EPSG:32617), drives region + grid
+SLOPE_RAW="$2"      # r.slope.aspect output (Float32 degrees), export target
+SHIM="$3"          # grass76_py3.py compatibility shim (was hardcoded)
+GRASS="python $SHIM"
+LOC="/tmp/gslope_$$"   # throwaway location, built from the CRS-bearing DEM
 
 # Fresh location built from the clipped DEM (carries CRS as WKT; no gcs.csv needed).
 rm -rf "$LOC"

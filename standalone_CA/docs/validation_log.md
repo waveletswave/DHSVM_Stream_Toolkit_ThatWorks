@@ -288,3 +288,29 @@ run_hydrology_grass.sh hardcodes the shim. Parameterizing the two GRASS .sh
 (read paths/shim from env or args) would close the last gap so a case/machine
 change needs only the DHSVM_* env vars. The Python layer is already fully
 parameterized.
+
+## GRASS .sh parameterization (closes the follow-up above)
+
+Both GRASS shell scripts now take their paths and the shim as arguments, so
+nothing case- or machine-specific is hardcoded in them.
+
+run_slope_grass.sh takes three positional args: clipped DEM, slope_raw out, and
+the shim. It builds its GRASS location in a throwaway /tmp dir (PID-tagged),
+matching run_hydrology_grass.sh, instead of a fixed /work path.
+run_hydrology_grass.sh now reads the shim from its third arg; it already took
+the DEM and out_dir. run_pipeline.sh resolves the three slope args from paths.py
+(the existing python3 -c idiom) and passes them in; hydrology.py imports SHIM
+from paths.py and passes it as the third arg.
+
+Result: a case or machine change needs only the DHSVM_* env vars end to end.
+Both front-end layers, Python and GRASS, are now parameterized.
+
+Regression: pure refactor. Under the CA defaults each arg equals the former
+hardcoded value (slope DEM = paths.ELEV_CLIPPED, slope out = paths.SLOPE_RAW,
+shim = paths.SHIM), so the GRASS-stage outputs are byte-identical by
+construction. The slope LOC change is a scratch GRASS location only and does
+not touch the exported slope_raw.tif. Re-ran run_pipeline.sh from a clean
+outputs/ and cmp'd the GRASS-stage outputs against the pre-change run:
+slope_raw.tif, flow_acc/flow_dir/stream_raster.tif, and streamfile.shp/.shx/.prj
+are byte-for-byte equal. streamfile.dbf differs only in the dBASE last-update
+date byte (the two runs were a day apart); no data byte differs.
