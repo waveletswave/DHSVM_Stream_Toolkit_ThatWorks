@@ -26,7 +26,7 @@ from pathlib import Path
 from rasterio.crs import CRS
 import rasterio
 
-from paths import ELEV_CLIPPED, OUT, EPSG, FLOW_ACC, FLOW_DIR, STREAM_RASTER
+from paths import ELEV_CLIPPED, OUT, EPSG, FLOW_ACC, FLOW_DIR, STREAM_RASTER, SHIM
 
 DEM_TIF  = ELEV_CLIPPED
 OUT_DIR  = OUT
@@ -41,11 +41,10 @@ def run_grass_chain():
         raise FileNotFoundError(f"[ERROR] clipped DEM not found: {DEM_TIF}")
     print(f"[step] GRASS hydrology chain (r.watershed -> r.stream.extract -> r.to.vect)")
     print(f"       DEM={DEM_TIF.name}  out={OUT_DIR}")
-    # NOTE: run_hydrology_grass.sh still hardcodes the GRASS shim path internally.
-    # Parameterizing the .sh (read shim from an env var / arg) is a separate
-    # follow-up; the .sh contract here remains (dem_tif, out_dir).
+    # The GRASS shim path comes from paths.py (DHSVM_GRASS_SHIM-overridable) and
+    # is passed to the .sh as its third arg. Contract: (dem_tif, out_dir, shim).
     subprocess.run(
-        ["bash", str(HYDRO_SH), str(DEM_TIF), str(OUT_DIR)],
+        ["bash", str(HYDRO_SH), str(DEM_TIF), str(OUT_DIR), str(SHIM)],
         check=True,
     )
 
