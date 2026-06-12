@@ -314,3 +314,16 @@ outputs/ and cmp'd the GRASS-stage outputs against the pre-change run:
 slope_raw.tif, flow_acc/flow_dir/stream_raster.tif, and streamfile.shp/.shx/.prj
 are byte-for-byte equal. streamfile.dbf differs only in the dBASE last-update
 date byte (the two runs were a day apart); no data byte differs.
+
+The standalone preprocessing pipeline was validated against the QGIS reference
+pipeline at three levels. Hourly streamflow over the full 2016-2018 simulation
+is numerically equivalent (NSE 0.99999510, PBIAS -0.000059%). Evaluated against
+observed Camp Branch streamflow over 2017-2018, the two pipelines yield identical
+performance: NSE 0.641, PBIAS -15.4%, r 0.822 for both, with absolute differences
+of zero at reporting precision. Annual ET partitioning is identical across runs
+(transpiration 576 mm, interception 172 mm, total 748 mm). The two input sets
+differ only in two documented numerical respects: a 1-ULP float difference in
+soil depth on 412 cells, and a d=0 tie-break in stream network extraction. These
+produce a maximum single-step streamflow deviation of 0.7% at the largest flow
+event and do not affect any aggregate metric. The CA test case is validated
+end-to-end.
