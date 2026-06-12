@@ -72,13 +72,38 @@ transfers across watersheds, which suits a pipeline meant to run on any basin
 from its boundary.
 
 Value. A_c is set by constant drop analysis, not by eye. This is a one-time
-analysis per watershed and DEM, run in QGIS or TauDEM, that yields the objective
-A_c; the pipeline then consumes that area. NHD serves as a sanity check where
-available, confirming the extracted channel heads sit near the observed ones.
+analysis per watershed and DEM that yields the objective A_c; the pipeline then
+consumes that area. The analysis is implemented in diagnostics/drop_analysis.py.
+NHD serves as a sanity check where available, confirming the extracted channel
+heads sit near the observed ones.
 
 The drop analysis is not part of the pipeline. It is the offline step that
 determines the parameter. The pipeline takes the resulting area and computes the
 cell threshold for whatever DEM resolution it is given.
+
+## Result for the CA case
+
+Drop analysis was run on the CA 28.16 m DEM with diagnostics/drop_analysis.py,
+which builds D8 flow routing with pyflwdir, sweeps support-area thresholds,
+assigns Strahler order, and tests first-order against higher-order stream drops
+by a Welch t-test. TauDEM was not available on the cluster; the pyflwdir
+implementation applies the same constant-drop criterion. The D8 routing here is
+independent of the pipeline's MFD routing by design, because the analysis yields
+a physical support area, and the area is the algorithm-independent quantity the
+pipeline consumes.
+
+The objective threshold, the smallest with absolute t below 2, is 50 cells,
+0.0396 km square. The passing band runs from 50 to 100 cells; every threshold in
+it satisfies the constant-drop law. The visual value of 60 cells, 0.0476 km
+square, falls inside this band at 0.83 times the objective minimum.
+
+The visual threshold holds up against the objective method and is kept as the
+default. Setting it to 50 would be equally valid under the law but would change
+the network and require the byte-identical validation baseline to be rebuilt,
+which is not worth the move to an adjacent passing value. The drop analysis
+gives the visual choice an objective basis it did not have before. The sweep is
+saved to drop_sweep.csv and plotted in drop_sweep.png by
+diagnostics/plot_drop.py.
 
 ## Resolution dependence
 
