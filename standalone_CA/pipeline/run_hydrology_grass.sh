@@ -21,7 +21,7 @@ ELEV="$1"          # clipped DEM (EPSG:32617), drives region + grid
 OUTDIR="$2"        # where GRASS exports land (GeoTIFF + shp)
 SHIM="$3"          # grass76_py3.py compatibility shim (was hardcoded)
 LOC=/tmp/ghydro_$$         # throwaway location, built from the CRS-bearing DEM
-THRESH=60                  # MIN_SRC_CELLS in prep
+THRESH="${4:?stream source threshold in cells required (computed from physical area by hydrology.py)}"
 CONV=5                     # r.watershed convergence in prep
 MEM=300                    # memory in prep
 

@@ -26,7 +26,7 @@ from pathlib import Path
 from rasterio.crs import CRS
 import rasterio
 
-from paths import ELEV_CLIPPED, OUT, EPSG, FLOW_ACC, FLOW_DIR, STREAM_RASTER, SHIM
+from paths import ELEV_CLIPPED, OUT, EPSG, FLOW_ACC, FLOW_DIR, STREAM_RASTER, SHIM, STREAM_SOURCE_AREA_M2
 
 DEM_TIF  = ELEV_CLIPPED
 OUT_DIR  = OUT
@@ -39,12 +39,14 @@ RASTER_OUTPUTS = [FLOW_ACC, FLOW_DIR, STREAM_RASTER]
 def run_grass_chain():
     if not DEM_TIF.exists():
         raise FileNotFoundError(f"[ERROR] clipped DEM not found: {DEM_TIF}")
+    with rasterio.open(DEM_TIF) as s:
+        cell_area = abs(s.transform.a * s.transform.e)   # m2 per cell
+    thresh_cells = max(1, round(STREAM_SOURCE_AREA_M2 / cell_area))
     print(f"[step] GRASS hydrology chain (r.watershed -> r.stream.extract -> r.to.vect)")
     print(f"       DEM={DEM_TIF.name}  out={OUT_DIR}")
-    # The GRASS shim path comes from paths.py (DHSVM_GRASS_SHIM-overridable) and
-    # is passed to the .sh as its third arg. Contract: (dem_tif, out_dir, shim).
+    print(f"       stream source area {STREAM_SOURCE_AREA_M2:.1f} m2 / cell {cell_area:.2f} m2 = {thresh_cells} cells")
     subprocess.run(
-        ["bash", str(HYDRO_SH), str(DEM_TIF), str(OUT_DIR), str(SHIM)],
+        ["bash", str(HYDRO_SH), str(DEM_TIF), str(OUT_DIR), str(SHIM), str(thresh_cells)],
         check=True,
     )
 
