@@ -11,6 +11,10 @@ a different case or machine by setting environment variables -- no code edits:
     export DHSVM_EPSG=32617
     export DHSVM_SRC_DEM=USGS_..._UTM17.tif       # input DEM filename (in INPUTS)
     export DHSVM_WATERSHED=cabr_watershed_UTM17.shp
+    export DHSVM_CASE=CA                          # watershed tag; drives RUN_OUT
+    export DHSVM_RUN_OUT=/work/ys451/dhsvm/CA     # DHSVM run dir (config + output)
+    export DHSVM_MET_FILE=/path/to/met.txt        # met forcing, given in full
+    export DHSVM_BIN=/work/ys451/dhsvm/bin/DHSVM  # compiled DHSVM binary
 
 Defaults reproduce the CA case on DCC.
 """
@@ -58,3 +62,14 @@ REF_INTERMED     = REF / "Intermediate_GIS"          # flow_acc/flow_dir/stream_
 REF_BINARIES     = REF / "DHSVM_input_binaries"      # soildepth.bin etc.
 REF_STREAMS      = REF / "DHSVM_input_streams"        # stream.class/network/map.dat + modelstate ref lives under REF/modelstate
 REF_MODELSTATE   = REF / "modelstate"
+
+# ----------------------------- DHSVM run paths (model run / config gen) ------
+# Used by standalone_CA/run/make_dhsvm_config.py to render the .dhs. CASE drives
+# RUN_OUT, so switching watershed is one env var. MET_FILE is given in full, not
+# derived: some adjacent watersheds share one met file, so the name stays
+# explicit rather than following a {CASE} convention.
+CASE      = os.environ.get("DHSVM_CASE", "CA")               # CA / AR / AR_UP / CA_TO ...
+RUN_OUT   = Path(os.environ.get("DHSVM_RUN_OUT", f"/work/ys451/dhsvm/{CASE}"))
+MET_FILE  = Path(os.environ.get("DHSVM_MET_FILE",
+    "/hpc/group/abmurraylab/ys451/dhsvm/met/DHSVM_met_input_CS01_hourly_0411_mean_wind_interpolation.txt"))
+DHSVM_BIN = Path(os.environ.get("DHSVM_BIN", "/work/ys451/dhsvm/bin/DHSVM"))
