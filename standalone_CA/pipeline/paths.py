@@ -73,3 +73,9 @@ RUN_OUT   = Path(os.environ.get("DHSVM_RUN_OUT", f"/work/ys451/dhsvm/{CASE}"))
 MET_FILE  = Path(os.environ.get("DHSVM_MET_FILE",
     "/hpc/group/abmurraylab/ys451/dhsvm/met/DHSVM_met_input_CS01_hourly_0411_mean_wind_interpolation.txt"))
 DHSVM_BIN = Path(os.environ.get("DHSVM_BIN", "/work/ys451/dhsvm/bin/DHSVM"))
+
+# Stream initiation: critical support area at the channel head, as a physical
+# area so the cell threshold scales with DEM resolution. Default is the CA
+# 60-cell equivalent (0.04757 km2), which keeps the byte-identical validation.
+# For any other watershed, set from drop analysis or override via the env var.
+STREAM_SOURCE_AREA_M2 = float(os.environ.get("DHSVM_STREAM_SOURCE_AREA_M2", 47571.5))
