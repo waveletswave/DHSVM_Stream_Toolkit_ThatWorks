@@ -22,13 +22,15 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-# Current visual threshold, for the marker. Resolve from paths.py when the
-# script runs inside the package; fall back to the CA value otherwise.
-try:
-    from paths import STREAM_SOURCE_AREA_M2
-    VISUAL_AREA_KM2 = float(STREAM_SOURCE_AREA_M2) / 1e6
-except Exception:
-    VISUAL_AREA_KM2 = 47571.5 / 1e6
+# Current visual threshold, for the marker, from paths.py (the pipeline's single
+# source of truth). paths.py is in pipeline/, one level up from diagnostics/, so
+# add it to the path: the import resolves from any directory and fails loudly
+# rather than silently using a stale CA constant.
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pipeline"))
+from paths import STREAM_SOURCE_AREA_M2
+
+VISUAL_AREA_KM2 = float(STREAM_SOURCE_AREA_M2) / 1e6
 
 
 def load_sweep(path):
