@@ -40,16 +40,16 @@ import rasterio
 from scipy import stats
 import pyflwdir
 
-# Resolve the default DEM and the current visual threshold from paths.py when
-# importable, so this script tracks the pipeline's settings. Fall back to the
-# CA defaults when run standalone outside the package.
-try:
-    from paths import ELEV_CLIPPED, STREAM_SOURCE_AREA_M2
-    DEFAULT_DEM = str(ELEV_CLIPPED)
-    CURRENT_AREA_M2 = float(STREAM_SOURCE_AREA_M2)
-except Exception:
-    DEFAULT_DEM = "/work/ys451/dhsvm_ca/standalone_dev/outputs/elev_clipped.tif"
-    CURRENT_AREA_M2 = 47571.5
+# paths.py is the pipeline's single source of truth. It lives in pipeline/, one
+# level up from diagnostics/, so add that directory to the path explicitly. The
+# import then resolves from any working directory, and a missing paths.py fails
+# loudly instead of silently falling back to a stale CA constant.
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pipeline"))
+from paths import ELEV_CLIPPED, STREAM_SOURCE_AREA_M2
+
+DEFAULT_DEM = str(ELEV_CLIPPED)
+CURRENT_AREA_M2 = float(STREAM_SOURCE_AREA_M2)
 
 
 def load_dem(path):
