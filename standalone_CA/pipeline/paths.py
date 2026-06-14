@@ -79,3 +79,10 @@ DHSVM_BIN = Path(os.environ.get("DHSVM_BIN", "/work/ys451/dhsvm/bin/DHSVM"))
 # 60-cell equivalent (0.04757 km2), which keeps the byte-identical validation.
 # For any other watershed, set from drop analysis or override via the env var.
 STREAM_SOURCE_AREA_M2 = float(os.environ.get("DHSVM_STREAM_SOURCE_AREA_M2", 47571.5))
+
+# Civil time zone standard meridian for the [AREA] block. NOT derived from the
+# basin longitude: rounding lon to the nearest 15 deg gives -90 (Central) for the
+# Southern Appalachians, but the basins are Eastern Time, whose standard meridian
+# is -75 (UTC-5 x 15) by definition. Declared here so the config is correct and
+# needs no hand edit; override DHSVM_TZ_MERIDIAN for a basin in another zone.
+TIME_ZONE_MERIDIAN = float(os.environ.get("DHSVM_TZ_MERIDIAN", -75.0))

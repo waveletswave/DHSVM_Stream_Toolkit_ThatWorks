@@ -65,18 +65,7 @@ Routing Neighbors = 8
 # MODEL AREA SECTION
 ################################################################################
 
-[AREA]                                   # Model area
-Coordinate System    =  UTM              # UTM or USER_DEFINED
-Extreme North        =  3896422.40882377 # Coordinate for northern edge of grid
-Extreme West         =  266591.46794298 # Coordinate for western edge of grid
-Center Latitude      =  35.174563   # Central parallel of basin (deg, WGS84)
-Center Longitude     =  -83.550347   # Central meridian of basin (deg, WGS84)
-Time Zone Meridian   =  -75.0         # Standard time meridian (deg)
-Number of Rows       =  74              # Number of rows
-Number of Columns    =  82              # Number of columns
-Grid spacing         =  28.158         # Grid resolution (m)
-Point North          =                    # For POINT mode only
-Point East           =                    # For POINT mode only
+@AREA_BLOCK@
 
 ################################################################################
 # TIME SECTION
