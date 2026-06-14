@@ -1,10 +1,12 @@
 """Render a DHSVM input file (.dhs) from CA.dhs.template using paths.py.
 
 CA.dhs.template is the calibrated baseline CA_LAI70.dhs with every input/output
-path replaced by an @TOKEN@. Only those paths are filled in here; all model
-parameters and options stay byte-identical to the baseline. A standalone run
-therefore differs from the baseline run only in the pipeline-produced inputs,
-which is the point of the comparison.
+path replaced by an @TOKEN@, and the [AREA] block replaced by @AREA_BLOCK@. The
+paths and [AREA] are filled in here; all other model parameters and options stay
+identical to the baseline. [AREA] is computed from the run DEM (area.py), so the
+same template fits any resolution or watershed; on the 28 m CA DEM it reproduces
+the calibrated block, so the standalone run still differs from the baseline only
+in the pipeline-produced inputs, which is the point of the comparison.
 
 The same template + paths.py generate a config for any input set: leave
 DHSVM_OUT at the standalone outputs (default) or point it at qgis_CA_ref (which
@@ -23,11 +25,13 @@ import re
 import sys
 from pathlib import Path
 
-# paths.py lives in the sibling pipeline/ dir (single source of truth). Make it
-# importable regardless of the current working directory.
+# paths.py lives in the sibling pipeline/ dir (single source of truth); area.py
+# sits next to this file. Make both importable regardless of the working dir.
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent / "pipeline"))
+sys.path.insert(0, str(HERE))
 import paths  # noqa: E402
+import area   # noqa: E402
 
 TEMPLATE = HERE / "CA.dhs.template"
 
@@ -58,7 +62,15 @@ def render():
     if not TEMPLATE.exists():
         raise FileNotFoundError(f"template not found: {TEMPLATE}")
     text = TEMPLATE.read_text()
-    for token, value in SUBS.items():
+
+    # [AREA] is computed from the run DEM (paths.ELEV_CLIPPED), not frozen in the
+    # template, so the same template fits any resolution / watershed. The time
+    # zone meridian comes from paths.TIME_ZONE_MERIDIAN (declared, not derived
+    # from longitude), so the config needs no hand edit.
+    subs = dict(SUBS)
+    subs["@AREA_BLOCK@"] = area.format_area_block(area.area_fields(paths.ELEV_CLIPPED)).rstrip("\n")
+
+    for token, value in subs.items():
         text = text.replace(token, value)
 
     # fail loud if any @TOKEN@ slipped through (typo / unfilled placeholder)
@@ -71,6 +83,8 @@ def render():
 
     print(f"[make_dhsvm_config] wrote {CONFIG_OUT}")
     print(f"  case          : {paths.CASE}")
+    print(f"  area DEM       : {paths.ELEV_CLIPPED}")
+    print(f"  tz meridian    : {paths.TIME_ZONE_MERIDIAN}")
     print(f"  grid binaries : {paths.BIN_DIR}")
     print(f"  stream files  : {paths.STREAMS_DIR}")
     print(f"  initial state : {paths.STATE_DIR}/")
