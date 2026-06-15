@@ -7,6 +7,9 @@ qgis_CA. This avoids the crop-to-cutline rounding-direction difference between
 rasterio.mask(crop=True) and GDAL warp, which otherwise leaves a one-pixel
 boundary ring (76x84 vs the reference 74x82). Pixels inside the window but
 outside the watershed polygon are set to nodata=-9999, matching the reference.
+
+This is the CA 28 m byte-match reproducer for the regression test. For a new
+basin or a different resolution, use prep_dem.py.
 """
 import geopandas as gpd
 import numpy as np
@@ -14,7 +17,7 @@ import rasterio
 from rasterio.windows import from_bounds
 from rasterio.features import geometry_mask
 
-from paths import SRC_DEM, WATERSHED, ELEV_CLIPPED, REF_ELEV_CLIPPED
+from paths import SRC_DEM, WATERSHED, ELEV_CLIPPED, REF_ELEV_CLIPPED, EPSG
 
 NODATA = -9999.0
 
@@ -50,7 +53,7 @@ def clip_dem():
         "width": data.shape[1],
         "count": 1,
         "dtype": "float32",
-        "crs": rasterio.crs.CRS.from_epsg(32617),
+        "crs": rasterio.crs.CRS.from_epsg(EPSG),
         "transform": win_transform,
         "nodata": NODATA,
     }
