@@ -26,11 +26,15 @@
 #   - a table to stdout: threshold, cells, area, drainage density, |t|, pass
 #   - the objective threshold and its A_c, against the current visual value
 #   - a CSV of the full sweep for plotting (quick-look of |t| vs threshold)
+#   - with --emit-area: only the objective A_c in m2 to stdout, nothing else,
+#     so a script can set DHSVM_STREAM_SOURCE_AREA_M2 from it. Exits nonzero if
+#     no threshold in the swept range passes.
 #
 # Input is one DEM (the clipped DEM from the clip stage). Nothing else; this
 # does not touch the pipeline outputs.
 #
 # Run:  python3 drop_analysis.py [elev_clipped.tif] [--csv out.csv]
+#       python3 drop_analysis.py elev_clipped.tif --emit-area --tmin 50 --tmax 800
 # =====================================================================
 
 import sys
@@ -177,26 +181,34 @@ def main():
     ap.add_argument("--tmax", type=int, default=300, help="max threshold (cells)")
     ap.add_argument("--step", type=int, default=10, help="threshold step (cells)")
     ap.add_argument("--csv", default=None, help="write the sweep to this CSV")
+    ap.add_argument("--emit-area", action="store_true",
+                    help="print only the objective support area in m2 to stdout "
+                         "(machine readable, for DHSVM_STREAM_SOURCE_AREA_M2); "
+                         "suppresses the table and exits nonzero if none pass")
     args = ap.parse_args()
+    emit = args.emit_area
 
-    print("=======================================================")
-    print("  CONSTANT STREAM DROP ANALYSIS")
-    print("=======================================================")
-    print(f"  DEM   : {args.dem}")
+    if not emit:
+        print("=======================================================")
+        print("  CONSTANT STREAM DROP ANALYSIS")
+        print("=======================================================")
+        print(f"  DEM   : {args.dem}")
 
     elev, nodata, transform, cell_area = load_dem(args.dem)
     valid = np.isfinite(elev) & (elev != nodata)
     basin_cells = int(valid.sum())
-    print(f"  cell area {cell_area:.2f} m2   valid cells {basin_cells}")
-    print(f"  current visual threshold: {CURRENT_AREA_M2:.1f} m2 "
-          f"= {CURRENT_AREA_M2/cell_area:.1f} cells = {CURRENT_AREA_M2/1e6:.5f} km2")
+    if not emit:
+        print(f"  cell area {cell_area:.2f} m2   valid cells {basin_cells}")
+        print(f"  current visual threshold: {CURRENT_AREA_M2:.1f} m2 "
+              f"= {CURRENT_AREA_M2/cell_area:.1f} cells = {CURRENT_AREA_M2/1e6:.5f} km2")
 
     flw = build_flow(elev, nodata, transform)
     uparea_cells = np.asarray(flw.upstream_area(unit="cell"))
 
-    print(f"\n  sweep {args.tmin}..{args.tmax} step {args.step} cells")
-    print(f"  {'cells':>6} {'km2':>9} {'n_str':>6} {'o1':>4} {'hi':>4} "
-          f"{'maxO':>4} {'Dd':>6} {'|t|':>7} {'neg':>4} {'pass':>5}")
+    if not emit:
+        print(f"\n  sweep {args.tmin}..{args.tmax} step {args.step} cells")
+        print(f"  {'cells':>6} {'km2':>9} {'n_str':>6} {'o1':>4} {'hi':>4} "
+              f"{'maxO':>4} {'Dd':>6} {'|t|':>7} {'neg':>4} {'pass':>5}")
 
     results = []
     for thr in range(args.tmin, args.tmax + 1, args.step):
@@ -205,17 +217,28 @@ def main():
         if r is None:
             continue
         results.append(r)
-        t_str = f"{r['t_abs']:.2f}" if not np.isnan(r['t_abs']) else "  nan"
-        print(f"  {r['cells']:>6} {r['area_km2']:>9.5f} {r['n_streams']:>6} "
-              f"{r['n_order1']:>4} {r['n_higher']:>4} {r['max_order']:>4} "
-              f"{r['dd']:>6.2f} {t_str:>7} {r['n_neg']:>4} "
-              f"{'yes' if r['passes'] else 'no':>5}")
+        if not emit:
+            t_str = f"{r['t_abs']:.2f}" if not np.isnan(r['t_abs']) else "  nan"
+            print(f"  {r['cells']:>6} {r['area_km2']:>9.5f} {r['n_streams']:>6} "
+                  f"{r['n_order1']:>4} {r['n_higher']:>4} {r['max_order']:>4} "
+                  f"{r['dd']:>6.2f} {t_str:>7} {r['n_neg']:>4} "
+                  f"{'yes' if r['passes'] else 'no':>5}")
 
-    # Objective threshold: smallest threshold that passes (|t| < 2).
+    # Objective threshold: smallest threshold that passes (|t| < 2). Computed
+    # once, used by both --emit-area and the human summary.
     passing = [r for r in results if r["passes"]]
+    obj = min(passing, key=lambda r: r["cells"]) if passing else None
+
+    if emit:
+        if obj is None:
+            print("drop_analysis: no threshold with |t|<2 in "
+                  f"{args.tmin}..{args.tmax} cells", file=sys.stderr)
+            sys.exit(1)
+        print(f"{obj['area_m2']:.1f}")
+        return
+
     print("\n=======================================================")
-    if passing:
-        obj = min(passing, key=lambda r: r["cells"])
+    if obj is not None:
         print(f"  objective threshold (smallest |t|<2):")
         print(f"    {obj['cells']} cells = {obj['area_m2']:.1f} m2 "
               f"= {obj['area_km2']:.5f} km2   (|t|={obj['t_abs']:.2f})")
