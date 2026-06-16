@@ -27,7 +27,10 @@
 #
 # Output:
 #   - a table to stdout: threshold, cells, area, drainage density, |t|, pass
-#   - the objective threshold and its A_c, against the current visual value
+#   - the objective threshold and its A_c. If a reference area is given (via
+#     --compare-area, or DHSVM_STREAM_SOURCE_AREA_M2 set in the env), the
+#     objective is compared against it; otherwise only the objective is shown,
+#     with a hint to set DHSVM_STREAM_SOURCE_AREA_M2 from it
 #   - a CSV of the full sweep for plotting (quick-look of |t| vs threshold)
 #   - with --emit-area: only the objective A_c in m2 to stdout, nothing else,
 #     so a script can set DHSVM_STREAM_SOURCE_AREA_M2 from it. Exits nonzero if
@@ -40,6 +43,7 @@
 #       python3 drop_analysis.py elev_clipped.tif --emit-area --tmin 50 --tmax 800
 # =====================================================================
 
+import os
 import sys
 import argparse
 import numpy as np
@@ -56,7 +60,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pipeline"))
 from paths import ELEV_CLIPPED, STREAM_SOURCE_AREA_M2
 
 DEFAULT_DEM = str(ELEV_CLIPPED)
-CURRENT_AREA_M2 = float(STREAM_SOURCE_AREA_M2)
+# Whether DHSVM_STREAM_SOURCE_AREA_M2 was set by the user (a basin-specific
+# pinned value) versus left at the paths.py default, which is CA's value. The
+# default is meaningful only for CA, so for any other basin we do not compare
+# the objective against it. That stale-CA comparison confused new users.
+ENV_AREA_SET = "DHSVM_STREAM_SOURCE_AREA_M2" in os.environ
 
 
 def load_dem(path):
@@ -219,12 +227,28 @@ def main():
                          "(noise on small basins). Use 2 to reject only single "
                          "points, or 1 for the old smallest-passing behavior")
     ap.add_argument("--csv", default=None, help="write the sweep to this CSV")
+    ap.add_argument("--compare-area", type=float, default=None,
+                    help="reference support area in m2 to compare the objective "
+                         "against, e.g. a previously chosen threshold. Default: "
+                         "compare only if DHSVM_STREAM_SOURCE_AREA_M2 is set in "
+                         "the environment, otherwise just report the objective")
     ap.add_argument("--emit-area", action="store_true",
                     help="print only the objective support area in m2 to stdout "
                          "(machine readable, for DHSVM_STREAM_SOURCE_AREA_M2); "
                          "suppresses the table and exits nonzero if none pass")
     args = ap.parse_args()
     emit = args.emit_area
+
+    # Optional reference area for the "objective vs reference" comparison:
+    # --compare-area wins; else the configured value only if the user set it in
+    # the env (basin-specific); else None, so a new basin gets no comparison
+    # against CA's default value.
+    if args.compare_area is not None:
+        compare = args.compare_area
+    elif ENV_AREA_SET:
+        compare = float(STREAM_SOURCE_AREA_M2)
+    else:
+        compare = None
 
     if not emit:
         print("=======================================================")
@@ -237,8 +261,9 @@ def main():
     basin_cells = int(valid.sum())
     if not emit:
         print(f"  cell area {cell_area:.2f} m2   valid cells {basin_cells}")
-        print(f"  current visual threshold: {CURRENT_AREA_M2:.1f} m2 "
-              f"= {CURRENT_AREA_M2/cell_area:.1f} cells = {CURRENT_AREA_M2/1e6:.5f} km2")
+        if compare is not None:
+            print(f"  reference threshold: {compare:.1f} m2 "
+                  f"= {compare/cell_area:.1f} cells = {compare/1e6:.5f} km2")
 
     flw = build_flow(elev, nodata, transform)
     uparea_cells = np.asarray(flw.upstream_area(unit="cell"))
@@ -295,16 +320,20 @@ def main():
             sk = ", ".join(str(r["cells"]) for r in below)
             print(f"    passes below the band (runs < {args.min_band}, "
                   f"rejected as noise): {sk} cells")
-        print(f"  current visual: {CURRENT_AREA_M2/cell_area:.0f} cells "
-              f"= {CURRENT_AREA_M2/1e6:.5f} km2")
-        ratio = obj["area_m2"] / CURRENT_AREA_M2
-        print(f"  objective / visual = {ratio:.2f}x")
-        if ratio > 1.3:
-            print(f"  -> visual threshold is too dense; objective wants a larger area")
-        elif ratio < 0.77:
-            print(f"  -> visual threshold is too sparse; objective wants a smaller area")
+        if compare is not None:
+            print(f"  reference: {compare/cell_area:.0f} cells "
+                  f"= {compare/1e6:.5f} km2")
+            ratio = obj["area_m2"] / compare
+            print(f"  objective / reference = {ratio:.2f}x")
+            if ratio > 1.3:
+                print(f"  -> reference picks a denser network than the objective")
+            elif ratio < 0.77:
+                print(f"  -> reference picks a sparser network than the objective")
+            else:
+                print(f"  -> objective is within ~30% of the reference value")
         else:
-            print(f"  -> visual threshold is within ~30% of the objective value")
+            print(f"  set DHSVM_STREAM_SOURCE_AREA_M2={obj['area_m2']:.1f} "
+                  f"to use this threshold for the pipeline.")
     else:
         print(f"  no sustained band of >= {args.min_band} consecutive passes "
               f"(|t|<2) in the swept range.")
