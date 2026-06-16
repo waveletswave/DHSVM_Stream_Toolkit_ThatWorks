@@ -8,7 +8,9 @@
 #
 # Order (decision B puts states AFTER vector, since channel state reads the
 # standalone stream files):
-#   1. clip            elev_clipped.tif
+#   1. DEM entry       elev_clipped.tif
+#        default            clip.py            (CA 28 m byte-match reproducer)
+#        DHSVM_DEM_SOURCE   prep_dem.py        (general; optional fetch_dem first)
 #   2. slope  (GRASS)  slope_raw.tif       (run_slope_grass.sh)
 #      slope  (py)     slope_filled.tif    (stamp CRS + slope_fill + validate)
 #   3. bins            DHSVM_input_binaries/{dem,mask,soil,veg,soildepth_uniform_*}.bin
@@ -26,9 +28,21 @@
 # Both GRASS .sh now take their paths and shim as args, so the DHSVM_* env vars
 # retarget the whole pipeline (Python and GRASS) end to end.
 #
+# DEM entry (stage 1) has two modes, switched by DHSVM_DEM_SOURCE:
+#   unset          -> clip.py, the CA 28 m byte-match reproducer (default)
+#   set to a path  -> general entry: prep_dem.py reprojects that source DEM to
+#                     paths.EPSG at DHSVM_DEM_RES (default 10 m) and masks to the
+#                     watershed; set DHSVM_FETCH=1 to fetch the source from 3DEP
+#                     first (needs a networked node). prep_dem and clip.py both
+#                     write paths.ELEV_CLIPPED, so stages 2..7 are unchanged.
+# For a data-driven stream threshold, set A_c once before running:
+#   export DHSVM_STREAM_SOURCE_AREA_M2=$(python3 ../diagnostics/drop_analysis.py \
+#          "$OUT/elev_clipped.tif" --emit-area --tmin 50 --tmax 800)
+#
 # Usage:
 #   bash run_pipeline.sh
-#   DHSVM_OUT=/path/to/out bash run_pipeline.sh    # retargets the whole run
+#   DHSVM_OUT=/path/to/out bash run_pipeline.sh                       # retarget run
+#   DHSVM_DEM_SOURCE=/path/src.tif DHSVM_DEM_RES=10 bash run_pipeline.sh   # general
 # =====================================================================
 set -euo pipefail
 
@@ -45,6 +59,7 @@ SLOPE_SH="$HERE/run_slope_grass.sh"
 SLOPE_DEM="$(python3 -c 'import paths; print(paths.ELEV_CLIPPED)')"
 SLOPE_RAW_OUT="$(python3 -c 'import paths; print(paths.SLOPE_RAW)')"
 GRASS_SHIM="$(python3 -c 'import paths; print(paths.SHIM)')"
+PREP_DIR="$HERE/../prep"
 
 echo "=========================================================="
 echo "  STANDALONE DHSVM PREPROCESSING PIPELINE"
@@ -60,10 +75,24 @@ need() {  # need <file/dir> <stage-name-that-should-have-made-it>
 
 step() { echo ""; echo ">>> [$1] $2"; }
 
-# ---------------------------------------------------------------- 1. clip
-step 1 "clip DEM to watershed"
-python3 clip.py
-need "$OUT/elev_clipped.tif" "clip"
+# ---------------------------------------------------------------- 1. DEM entry
+# Two modes, switched by DHSVM_DEM_SOURCE (see header). Both write
+# paths.ELEV_CLIPPED, so everything downstream is identical.
+if [ -n "${DHSVM_DEM_SOURCE:-}" ]; then
+  step 1 "DEM entry (general: prep_dem)"
+  SRC="$DHSVM_DEM_SOURCE"
+  if [ "${DHSVM_FETCH:-0}" = "1" ]; then
+    echo "    fetch DEM from 3DEP -> $SRC  (needs a networked node)"
+    python3 "$PREP_DIR/fetch_dem.py" "$SRC"
+    need "$SRC" "fetch_dem"
+  fi
+  echo "    prep_dem $SRC -> elev_clipped.tif  (res ${DHSVM_DEM_RES:-10} m)"
+  python3 "$PREP_DIR/prep_dem.py" "$SRC"
+else
+  step 1 "DEM entry (CA 28 m reproducer: clip.py)"
+  python3 clip.py
+fi
+need "$OUT/elev_clipped.tif" "DEM entry"
 
 # ---------------------------------------------------------------- 2. slope
 step 2 "slope (GRASS r.slope.aspect)"
