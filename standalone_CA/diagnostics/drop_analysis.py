@@ -12,9 +12,12 @@
 #   of support-area thresholds. For each threshold we extract the stream
 #   network, assign Strahler order, and measure the drop of every stream. We
 #   test whether the mean drop of first-order streams differs from the higher
-#   orders by a t-test. The smallest threshold for which the difference is not
-#   significant (absolute t below 2) is the finest network consistent with the
-#   law, and is taken as the objective threshold.
+#   orders by a t-test. The objective threshold is the start of the first
+#   sustained band of consecutive thresholds for which the difference is not
+#   significant (absolute t below 2). Requiring a sustained band, rather than
+#   the single smallest passing threshold, rejects isolated noise dips where
+#   |t| falls below 2 at one threshold by chance. These are common on small
+#   basins, where the t-test samples are small and |t| is jumpy.
 #
 # Flow routing here is pyflwdir's D8, built from the DEM. This is independent
 # of the GRASS MFD routing in the pipeline by design: the analysis yields a
@@ -174,12 +177,47 @@ def evaluate_threshold(flw, elev, transform, uparea_cells, cell_area,
     )
 
 
+def first_sustained_band(results, min_band):
+    """Start of the first sustained passing band in the sweep.
+
+    A sustained band is a run of at least min_band consecutive passing
+    thresholds (consecutive entries in the swept sequence, so it tracks the
+    --step spacing). Returns (start_result, band_results); the objective is the
+    band's smallest threshold. Returns (None, []) if no run reaches min_band.
+
+    This rejects isolated single-threshold passes, and any run shorter than
+    min_band, which are noise on small basins where the t-test is jumpy. The
+    plain smallest-passing rule would take those noise dips. With min_band=1
+    this reduces to the smallest passing threshold (the old behavior).
+    """
+    n = len(results)
+    i = 0
+    while i < n:
+        if not results[i]["passes"]:
+            i += 1
+            continue
+        j = i
+        while j < n and results[j]["passes"]:
+            j += 1
+        run = results[i:j]                       # maximal consecutive pass run
+        if len(run) >= min_band:
+            return run[0], run
+        i = j
+    return None, []
+
+
 def main():
     ap = argparse.ArgumentParser(description="Constant stream drop analysis")
     ap.add_argument("dem", nargs="?", default=DEFAULT_DEM)
     ap.add_argument("--tmin", type=int, default=10, help="min threshold (cells)")
     ap.add_argument("--tmax", type=int, default=300, help="max threshold (cells)")
     ap.add_argument("--step", type=int, default=10, help="threshold step (cells)")
+    ap.add_argument("--min-band", type=int, default=3,
+                    help="min consecutive passing thresholds to count as a "
+                         "sustained band; the objective is the band's smallest "
+                         "threshold. Rejects isolated single-threshold passes "
+                         "(noise on small basins). Use 2 to reject only single "
+                         "points, or 1 for the old smallest-passing behavior")
     ap.add_argument("--csv", default=None, help="write the sweep to this CSV")
     ap.add_argument("--emit-area", action="store_true",
                     help="print only the objective support area in m2 to stdout "
@@ -224,24 +262,39 @@ def main():
                   f"{r['dd']:>6.2f} {t_str:>7} {r['n_neg']:>4} "
                   f"{'yes' if r['passes'] else 'no':>5}")
 
-    # Objective threshold: smallest threshold that passes (|t| < 2). Computed
-    # once, used by both --emit-area and the human summary.
+    # Objective threshold: start of the first sustained passing band, the first
+    # run of at least --min-band consecutive thresholds with |t|<2. This rejects
+    # isolated single-threshold passes, noise on small basins where the t-test
+    # is jumpy. Computed once, used by both --emit-area and the human summary.
     passing = [r for r in results if r["passes"]]
-    obj = min(passing, key=lambda r: r["cells"]) if passing else None
+    obj, band = first_sustained_band(results, args.min_band)
+    # passing thresholds below the chosen band (runs shorter than --min-band),
+    # reported for transparency so the user sees what was rejected and why.
+    below = [r for r in passing
+             if obj is not None and r["cells"] < obj["cells"]]
 
     if emit:
         if obj is None:
-            print("drop_analysis: no threshold with |t|<2 in "
-                  f"{args.tmin}..{args.tmax} cells", file=sys.stderr)
+            print(f"drop_analysis: no sustained band (>= {args.min_band} "
+                  f"consecutive |t|<2) in {args.tmin}..{args.tmax} cells",
+                  file=sys.stderr)
             sys.exit(1)
         print(f"{obj['area_m2']:.1f}")
         return
 
     print("\n=======================================================")
     if obj is not None:
-        print(f"  objective threshold (smallest |t|<2):")
+        band_lo, band_hi = band[0]["cells"], band[-1]["cells"]
+        print(f"  objective threshold (start of first sustained band, "
+              f">= {args.min_band} consecutive |t|<2):")
         print(f"    {obj['cells']} cells = {obj['area_m2']:.1f} m2 "
               f"= {obj['area_km2']:.5f} km2   (|t|={obj['t_abs']:.2f})")
+        print(f"    band: {band_lo} to {band_hi} cells "
+              f"({len(band)} consecutive thresholds)")
+        if below:
+            sk = ", ".join(str(r["cells"]) for r in below)
+            print(f"    passes below the band (runs < {args.min_band}, "
+                  f"rejected as noise): {sk} cells")
         print(f"  current visual: {CURRENT_AREA_M2/cell_area:.0f} cells "
               f"= {CURRENT_AREA_M2/1e6:.5f} km2")
         ratio = obj["area_m2"] / CURRENT_AREA_M2
@@ -253,7 +306,12 @@ def main():
         else:
             print(f"  -> visual threshold is within ~30% of the objective value")
     else:
-        print("  no threshold in the swept range satisfies |t|<2.")
+        print(f"  no sustained band of >= {args.min_band} consecutive passes "
+              f"(|t|<2) in the swept range.")
+        if passing:
+            iso = ", ".join(str(r["cells"]) for r in passing)
+            print(f"  only short/isolated passes at: {iso} cells "
+                  f"(rejected; lower --min-band to accept them).")
         print("  widen the range (--tmin/--tmax) or inspect the drop table above.")
     print("=======================================================")
 
