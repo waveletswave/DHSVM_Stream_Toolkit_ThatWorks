@@ -59,7 +59,7 @@ def stream_polylines(stream_path, transform, ref_crs):
     streams = gpd.read_file(stream_path)
     if ref_crs is not None and streams.crs is not None and streams.crs != ref_crs:
         streams = streams.to_crs(ref_crs)
-    inv = ~transform  # UTM (x, y) -> fractional (col, row)
+    inv = ~transform  # UTM (x, y) -> fractional (col, row), corner-referenced
     out = []
     for geom in streams.geometry:
         if geom is None:
@@ -70,9 +70,49 @@ def stream_polylines(stream_path, transform, ref_crs):
             cols, rows = [], []
             for x, y in zip(xs, ys):
                 c, r = inv * (x, y)
-                cols.append(c)
-                rows.append(r)
+                # inv maps a cell center to (col+0.5, row+0.5), but imshow
+                # centers cell (row, col) at axis (col, row). Subtract 0.5 from
+                # each so the stream line lands in the raster and boundary
+                # frame; the boundary applies the same -0.5 via
+                # Affine.translation(-0.5, -0.5) in draw_boundary.
+                cols.append(c - 0.5)
+                rows.append(r - 0.5)
             out.append((cols, rows))
+    return out
+
+
+def boundary_polylines(boundary_path, transform, ref_crs):
+    """Read a watershed-boundary polygon, return its exterior and interior
+    rings as (cols, rows) polylines in pixel space.
+
+    Same frame convention as stream_polylines: inv maps a cell center to
+    (col+0.5, row+0.5), so subtract 0.5 to share the raster frame. Drawing the
+    actual polygon (instead of the valid-data mask contour) gives a smooth line
+    and, as a side benefit, makes any polygon-vs-rasterized-mask mismatch
+    visible: the smooth line will not hug the colored cells if the two disagree.
+    """
+    gdf = gpd.read_file(boundary_path)
+    if ref_crs is not None and gdf.crs is not None and gdf.crs != ref_crs:
+        gdf = gdf.to_crs(ref_crs)
+    inv = ~transform
+
+    def ring_to_pix(coords):
+        cols, rows = [], []
+        for x, y in coords:
+            c, r = inv * (x, y)
+            cols.append(c - 0.5)
+            rows.append(r - 0.5)
+        return cols, rows
+
+    out = []
+    for geom in gdf.geometry:
+        if geom is None:
+            continue
+        polys = [geom] if geom.geom_type == "Polygon" else list(geom.geoms)
+        for poly in polys:
+            out.append(ring_to_pix(poly.exterior.coords))
+            for ring in poly.interiors:
+                out.append(ring_to_pix(ring.coords))
     return out
 
 
@@ -103,14 +143,54 @@ def data_mask(arr):
     return np.ones(arr.shape, float)
 
 
-def draw_boundary(ax, arr):
-    """Basin boundary as the exact cell-edge polygon of the valid-data mask.
+def data_bbox(arr):
+    """(rmin, rmax, cmin, cmax) grid indices of the valid-data bounding box.
 
-    Uses features.shapes rather than contour. contour draws the 0.5 isoline
-    between cell centers, so the true edge along the outermost row/col gets
-    clipped and the boundary looks open. The polygon edge closes correctly and
-    hugs the real basin outline. Same method as the location footprint.
+    Inclusive indices of the first and last rows and cols holding any valid
+    cell. Panels crop their view to this box so the basin fills the frame
+    instead of floating in the padded-grid nodata margin.
     """
+    if np.ma.is_masked(arr):
+        valid = ~np.ma.getmaskarray(arr)
+    else:
+        valid = np.ones(arr.shape, bool)
+    rows = np.where(np.any(valid, axis=1))[0]
+    cols = np.where(np.any(valid, axis=0))[0]
+    if rows.size == 0 or cols.size == 0:        # all nodata: fall back to full grid
+        return 0, arr.shape[0] - 1, 0, arr.shape[1] - 1
+    return int(rows[0]), int(rows[-1]), int(cols[0]), int(cols[-1])
+
+
+def _frame_aspect(bbox):
+    """box_aspect (height / width) of the cropped view, buffer included.
+
+    Shared by rowcol_axes and the location panel so all six frames keep
+    identical proportions after cropping.
+    """
+    rmin, rmax, cmin, cmax = bbox
+    m = max(rmax - rmin, cmax - cmin) * 0.04
+    h = (rmax - rmin + 1) + 2 * m
+    w = (cmax - cmin + 1) + 2 * m
+    return h / w
+
+
+def draw_boundary(ax, arr, boundary_lines=None):
+    """Watershed boundary.
+
+    If boundary_lines (rings from the boundary shapefile, via boundary_polylines)
+    are supplied, draw them as a single smooth line. Otherwise fall back to the
+    exact cell-edge polygon of the valid-data mask.
+
+    Mask-contour fallback uses features.shapes rather than contour. contour
+    draws the 0.5 isoline between cell centers, so the true edge along the
+    outermost row/col gets clipped and the boundary looks open. The polygon edge
+    closes correctly and hugs the real basin outline. Same method as the
+    location footprint.
+    """
+    if boundary_lines is not None:
+        for cols, rows in boundary_lines:
+            ax.plot(cols, rows, color="black", linewidth=1.6, zorder=5)
+        return
     m = data_mask(arr).astype("uint8")
     tr = Affine.translation(-0.5, -0.5)  # cell corners -> imshow pixel coords
     for geom, val in features.shapes(m, mask=m.astype(bool), transform=tr):
@@ -132,15 +212,20 @@ def draw_streams(ax, polylines):
                               pe.Normal()])
 
 
-def rowcol_axes(ax, nrows, ncols, grid=False):
+def rowcol_axes(ax, bbox, grid=False):
+    rmin, rmax, cmin, cmax = bbox
     ax.set_xlabel("Column index")
     ax.set_ylabel("Row index")
-    # 0-based indices, matching DHSVM input files: stream_network.py writes
-    # col = int((x - xmin) / px), so the top-left cell is (0, 0).
+    # Crop the view to the basin's valid-data bbox, but keep the tick *labels*
+    # as true DHSVM grid indices: stream_network.py writes col = int((x - xmin)
+    # / px), so cell (row, col) maps straight to the .bin files. (0, 0) sits
+    # off-frame whenever the basin does not reach the padded-grid corner, the
+    # common case. Do not re-base labels to 0; that would break the
+    # cell-to-.bin correspondence these panels exist to check.
     # Small buffer so the basin does not sit flush against the frame.
-    m = max(nrows, ncols) * 0.04
-    x0, x1 = -0.5 - m, ncols - 0.5 + m
-    y_top, y_bot = -0.5 - m, nrows - 0.5 + m
+    m = max(rmax - rmin, cmax - cmin) * 0.04
+    x0, x1 = cmin - 0.5 - m, cmax + 0.5 + m
+    y_top, y_bot = rmin - 0.5 - m, rmax + 0.5 + m
     ax.set_xlim(x0, x1)
     ax.set_ylim(y_bot, y_top)  # descending: imshow origin is upper
     # Drive the frame shape with box_aspect (not aspect='equal'); this keeps
@@ -149,43 +234,47 @@ def rowcol_axes(ax, nrows, ncols, grid=False):
     ax.set_aspect("auto")
     ax.set_box_aspect((y_bot - y_top) / (x1 - x0))
     if grid:
-        ax.set_xticks(np.arange(-0.5, ncols, 1), minor=True)
-        ax.set_yticks(np.arange(-0.5, nrows, 1), minor=True)
+        ax.set_xticks(np.arange(cmin - 0.5, cmax + 1, 1), minor=True)
+        ax.set_yticks(np.arange(rmin - 0.5, rmax + 1, 1), minor=True)
         ax.grid(which="minor", color="0.6", linewidth=0.25, alpha=0.4)
 
 
 # ---- panels ----
 
-def panel_dem(ax, fig, dem, polylines, nrows, ncols):
+def panel_dem(ax, fig, dem, polylines, bbox, boundary_lines=None):
+    nrows, ncols = dem.shape
+    valid = int(np.ma.count(dem))          # basin cells; nodata margin excluded
+    total = nrows * ncols
     ax.imshow(hillshade(dem), cmap="gray", origin="upper", zorder=0)
     im = ax.imshow(dem, cmap="terrain", origin="upper", alpha=0.85, zorder=1)
     fig.colorbar(im, ax=ax, shrink=0.85, label="Elevation (m)")
     draw_streams(ax, polylines)
-    draw_boundary(ax, dem)
-    ax.set_title(f"DEM + stream network    {nrows} rows x {ncols} cols")
-    rowcol_axes(ax, nrows, ncols, grid=True)
+    draw_boundary(ax, dem, boundary_lines)
+    ax.set_title(f"DEM + stream network    {nrows} rows x {ncols} cols\n"
+                 f"basin: {valid} of {total} cells ({100 * valid / total:.0f}% data)")
+    rowcol_axes(ax, bbox, grid=True)
 
 
-def panel_continuous(ax, fig, arr, label, cmap, nrows, ncols):
+def panel_continuous(ax, fig, arr, label, cmap, bbox, boundary_lines=None):
     im = ax.imshow(arr, cmap=cmap, origin="upper")
     fig.colorbar(im, ax=ax, shrink=0.85, label=label)
-    draw_boundary(ax, arr)
+    draw_boundary(ax, arr, boundary_lines)
     vmin, vmax = float(np.ma.min(arr)), float(np.ma.max(arr))
     ax.set_title(f"{label.split(' (')[0]}    min {vmin:.3g}  max {vmax:.3g}")
-    rowcol_axes(ax, nrows, ncols)
+    rowcol_axes(ax, bbox)
 
 
-def panel_flow_accum(ax, fig, acc, nrows, ncols):
+def panel_flow_accum(ax, fig, acc, bbox, boundary_lines=None):
     mag = np.ma.masked_less_equal(np.ma.abs(acc), 0)
     im = ax.imshow(mag, cmap="cubehelix_r", origin="upper",
                    norm=LogNorm(vmin=1, vmax=float(np.ma.max(mag))))
     fig.colorbar(im, ax=ax, shrink=0.85, label="Flow accumulation (cells, log)")
-    draw_boundary(ax, acc)
+    draw_boundary(ax, acc, boundary_lines)
     ax.set_title("Flow accumulation")
-    rowcol_axes(ax, nrows, ncols)
+    rowcol_axes(ax, bbox)
 
 
-def panel_flow_dir(ax, fig, arr, nrows, ncols):
+def panel_flow_dir(ax, fig, arr, bbox, boundary_lines=None):
     # GRASS r.watershed drainage: 1-8 are D8 directions; negatives mark cells
     # that drain out of the region (basin edge). Collapse all negatives into a
     # single "out" class in neutral gray so the eight real directions read
@@ -204,9 +293,9 @@ def panel_flow_dir(ax, fig, arr, nrows, ncols):
     cbar = fig.colorbar(im, ax=ax, shrink=0.85, ticks=vals,
                         label="Flow direction (D8)")
     cbar.ax.set_yticklabels(["out" if v < 0 else f"{int(v)}" for v in vals])
-    draw_boundary(ax, a)
+    draw_boundary(ax, a, boundary_lines)
     ax.set_title("Flow direction (D8)")
-    rowcol_axes(ax, nrows, ncols)
+    rowcol_axes(ax, bbox)
 
 
 def _load_basemap_features():
@@ -238,7 +327,7 @@ def _load_basemap_features():
         return None
 
 
-def panel_location(fig, pos, footprint, nrows, ncols):
+def panel_location(fig, pos, footprint, bbox):
     """Watershed footprint on a lon/lat map. The view range adapts to the
     watershed's own extent, so a small one zooms in and a large one pulls back.
     Adds a cartopy basemap when reachable, otherwise footprint + graticule."""
@@ -280,10 +369,10 @@ def panel_location(fig, pos, footprint, nrows, ncols):
         # 1/cos(lat) so a degree of longitude and latitude have equal ground
         # length, keeping the footprint undistorted.
         ax.set_aspect(1.0 / math.cos(math.radians(lat_c)))
-    # Outer frame matches the data panels (box_aspect = nrows/ncols) so the
-    # panel is no larger than the others in either dimension; the equidistant
-    # map sits inside, with the leftover space as margin.
-    ax.set_box_aspect(nrows / ncols)
+    # Outer frame matches the data panels (same cropped-basin box_aspect) so
+    # the panel is no larger than the others in either dimension; the
+    # equidistant map sits inside, with the leftover space as margin.
+    ax.set_box_aspect(_frame_aspect(bbox))
     for s in ax.spines.values():
         s.set_visible(True)
         s.set_linewidth(0.8)
@@ -299,9 +388,12 @@ def main():
         description="Combined quick-look for DHSVM pipeline outputs")
     p.add_argument("--run-dir", required=True, type=Path)
     p.add_argument("--out", type=Path, default=None,
-                   help="output PNG (default: run-dir/quicklook/ca_quicklook.png)")
+                   help="output PNG (default: run-dir/quicklook/quicklook.png)")
     p.add_argument("--dem", default="elev_clipped.tif")
     p.add_argument("--stream", default="streamfile.shp")
+    p.add_argument("--boundary", default=None,
+                   help="watershed-boundary polygon (shp). If given, drawn as a "
+                        "smooth line; otherwise the valid-data mask contour is used")
     p.add_argument("--soil-depth", default="soildepth.tif")
     p.add_argument("--flow-accum", default="flow_acc.tif")
     p.add_argument("--flow-dir", default="flow_dir.tif")
@@ -309,13 +401,15 @@ def main():
     p.add_argument("--slope-unit", default="deg",
                    help="label for the slope colorbar: deg, %%, or fraction")
     p.add_argument("--dpi", type=int, default=300)
-    p.add_argument("--title", default="Camp Branch CA  -  pipeline quick-look")
+    p.add_argument("--title", default="DHSVM pipeline quick-look")
     args = p.parse_args()
 
     rd = args.run_dir
     dem, transform, crs = read_raster(rd / args.dem)
-    nrows, ncols = dem.shape
+    bbox = data_bbox(dem)  # crop every panel to the basin, not the padded grid
     polylines = stream_polylines(rd / args.stream, transform, crs)
+    boundary_lines = (boundary_polylines(Path(args.boundary), transform, crs)
+                      if args.boundary else None)
     footprint = basin_footprint_wgs84(dem, transform, crs)
 
     fig = plt.figure(figsize=(19, 11.5), constrained_layout=True)
@@ -323,26 +417,26 @@ def main():
 
     # Top row: DEM+stream, soil depth, slope. Bottom row: flow accumulation,
     # flow direction, basin location (flow_acc and flow_dir sit adjacent).
-    panel_dem(fig.add_subplot(2, 3, 1), fig, dem, polylines, nrows, ncols)
+    panel_dem(fig.add_subplot(2, 3, 1), fig, dem, polylines, bbox, boundary_lines)
 
     soil, _, _ = read_raster(rd / args.soil_depth)
     panel_continuous(fig.add_subplot(2, 3, 2), fig, soil,
-                     "Soil depth (m)", "YlOrBr", nrows, ncols)
+                     "Soil depth (m)", "YlOrBr", bbox, boundary_lines)
 
     slope, _, _ = read_raster(rd / args.slope)
     panel_continuous(fig.add_subplot(2, 3, 3), fig, slope,
-                     f"Slope ({args.slope_unit})", "magma", nrows, ncols)
+                     f"Slope ({args.slope_unit})", "magma", bbox, boundary_lines)
 
     acc, _, _ = read_raster(rd / args.flow_accum)
-    panel_flow_accum(fig.add_subplot(2, 3, 4), fig, acc, nrows, ncols)
+    panel_flow_accum(fig.add_subplot(2, 3, 4), fig, acc, bbox, boundary_lines)
 
     fdir, _, _ = read_raster(rd / args.flow_dir)
-    panel_flow_dir(fig.add_subplot(2, 3, 5), fig, fdir, nrows, ncols)
+    panel_flow_dir(fig.add_subplot(2, 3, 5), fig, fdir, bbox, boundary_lines)
 
     if footprint is not None:
-        panel_location(fig, (2, 3, 6), footprint, nrows, ncols)
+        panel_location(fig, (2, 3, 6), footprint, bbox)
 
-    out = args.out or (rd / "quicklook" / "ca_quicklook.png")
+    out = args.out or (rd / "quicklook" / "quicklook.png")
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=args.dpi, bbox_inches="tight")
     plt.close(fig)
