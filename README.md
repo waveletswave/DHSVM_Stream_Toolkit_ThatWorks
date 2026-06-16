@@ -24,28 +24,37 @@ The standalone version uses `rasterio` + `geopandas` + `shapely` + `pyflwdir` an
 
 One command turns a source DEM and a watershed polygon into a complete DHSVM input set. The stages run in dependency order, each checked before the next, driven by environment variables read in `pipeline/paths.py` so a new basin or machine needs no code edits.
 
-```
-standalone_CA/
-  prep/         fetch_dem.py     fetch a DEM over the basin from USGS 3DEP (the one networked step)
-                prep_dem.py      reproject to the pipeline CRS at the target resolution, clip to the polygon
-  pipeline/     clip.py          CA 28 m byte-match reproducer for the regression test
-                slope.py         GRASS r.slope.aspect, then CRS stamp and fill conditioning (slope_fill.py)
-                bins.py          dem / mask / soil / veg binaries plus uniform soil-depth baselines
-                hydrology.py     GRASS r.watershed -> r.stream.extract -> r.to.vect (flow, stream raster, vector)
-                soildepth.py     dynamic soil depth from the PNNL weighting
-                vector_attrs.py  stream attributes; channelclass_standalone.py -> stream.class.dat;
-                                 stream_network.py -> stream.network.dat + stream.map.dat
-                states.py        initial Interception / Snow / Soil / Channel states
-                paths.py         single source of truth for paths and config (env-overridable)
-                run_pipeline.sh  the one-command orchestrator (fail-fast); the GRASS stages are run_*_grass.sh
-                compare.py, compare_bin.py   raster and binary comparison helpers for validation
-  diagnostics/  quicklook.py     six-panel diagnostic figure (DEM + network, soil depth, slope, flow, location)
-                drop_analysis.py constant stream drop analysis to pick the stream support area A_c
-                plot_drop.py     plot the drop sweep; iso_check_*.py and check_slope_units.py are isolation checks
-  run/          make_dhsvm_config.py  render the DHSVM .dhs config (DEM-derived [AREA], declared meridian);
-                                      area.py and CA.dhs.template support it
-  docs/         validation_log.md, NEW_WATERSHED_GUIDE.md, DCC_SETUP.md, BUILD_DCC.md, stream_threshold.md
-```
+The code under `standalone_CA/` is grouped by role.
+
+**`prep/`** fetches and clips the DEM.
+
+- `fetch_dem.py`: fetch a DEM over the basin from USGS 3DEP (the one networked step)
+- `prep_dem.py`: reproject to the pipeline CRS at the target resolution, then clip tight to the polygon
+
+**`pipeline/`** runs the processing stages in dependency order, plus orchestration.
+
+- `clip.py`: CA 28 m byte-match reproducer for the regression test
+- `slope.py`, `slope_fill.py`: GRASS r.slope.aspect, then CRS stamp and fill conditioning
+- `bins.py`: dem / mask / soil / veg binaries plus uniform soil-depth baselines
+- `hydrology.py`: GRASS r.watershed, r.stream.extract, r.to.vect (flow, stream raster, stream vector)
+- `soildepth.py`: dynamic soil depth from the PNNL weighting
+- `vector_attrs.py`, `channelclass_standalone.py`, `stream_network.py`: stream attributes, then stream.class.dat, stream.network.dat, and stream.map.dat
+- `states.py`: initial Interception / Snow / Soil / Channel states
+- `paths.py`: single source of truth for paths and config, env-overridable
+- `run_pipeline.sh`: the one-command orchestrator, fail-fast; the GRASS stages are `run_slope_grass.sh` and `run_hydrology_grass.sh`
+- `compare.py`, `compare_bin.py`: raster and binary comparison helpers for validation
+
+**`diagnostics/`** holds the figures and checks.
+
+- `quicklook.py`: six-panel diagnostic figure (DEM with network, soil depth, slope, flow, location)
+- `drop_analysis.py`: constant stream drop analysis to pick the stream support area A_c
+- `plot_drop.py`, `iso_check_*.py`, `check_slope_units.py`: the drop-sweep plot and the isolation checks
+
+**`run/`** generates the DHSVM run configuration.
+
+- `make_dhsvm_config.py`, `area.py`, `CA.dhs.template`: render the DHSVM .dhs config, with a DEM-derived [AREA] block and a declared meridian
+
+**`docs/`** holds the documentation: `validation_log.md`, `NEW_WATERSHED_GUIDE.md`, `DCC_SETUP.md`, `BUILD_DCC.md`, and `stream_threshold.md`.
 
 ### Running it
 
