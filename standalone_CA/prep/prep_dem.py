@@ -52,13 +52,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "pipeline"))
 from paths import WATERSHED, EPSG, ELEV_CLIPPED
 
 DEFAULT_RES = 10.0    # target cell size in metres; override with --res or DHSVM_DEM_RES
-PAD_M = 200.0         # extent pad so the basin is not flush to the grid edge
+PAD_CELLS = 0         # cells of margin around the basin bbox; 0 = tight, like CA
 NODATA = -9999.0
 
 
-def target_grid(watershed_utm, res, pad_m=PAD_M):
+def target_grid(watershed_utm, res, pad_cells=PAD_CELLS):
     """Target-CRS grid over the watershed bounds plus a small pad, snapped so
-    cell edges fall on multiples of res."""
+    cell edges fall on multiples of res. pad_cells is a margin in whole cells,
+    so the same margin holds across resolutions (a fixed metre pad would be a
+    different number of cells at 10 m vs 30 m)."""
+    pad_m = pad_cells * res
     minx, miny, maxx, maxy = watershed_utm.total_bounds
     minx = math.floor((minx - pad_m) / res) * res
     miny = math.floor((miny - pad_m) / res) * res
@@ -70,13 +73,14 @@ def target_grid(watershed_utm, res, pad_m=PAD_M):
     return transform, width, height, (minx, miny, maxx, maxy)
 
 
-def prep_dem(src_path, out_path, watershed_path, res, epsg, pad_m=PAD_M):
+def prep_dem(src_path, out_path, watershed_path, res, epsg, pad_cells=PAD_CELLS):
     """Reproject src_path to EPSG:epsg on a clean res-metre grid and mask it to
     the watershed polygon. Write out_path. Return (valid_cells, total_cells)."""
     dst_crs = "EPSG:%d" % epsg
     wsf = gpd.read_file(watershed_path).to_crs(dst_crs)
-    transform, width, height, bounds = target_grid(wsf, res, pad_m)
-    print("target: %s  %.3f m  %d rows x %d cols" % (dst_crs, res, height, width))
+    transform, width, height, bounds = target_grid(wsf, res, pad_cells)
+    print("target: %s  %.3f m  %d rows x %d cols  (pad %d cells)"
+          % (dst_crs, res, height, width, pad_cells))
     print("extent (%s): %s" % (dst_crs, tuple(round(b, 1) for b in bounds)))
 
     dst = np.full((height, width), NODATA, dtype="float32")
@@ -133,9 +137,15 @@ def main():
                     help="watershed polygon (default paths.WATERSHED, env DHSVM_WATERSHED)")
     ap.add_argument("--epsg", type=int, default=EPSG,
                     help="target EPSG (default paths.EPSG = %d, env DHSVM_EPSG)" % EPSG)
+    ap.add_argument("--pad-cells", type=int,
+                    default=int(os.environ.get("DHSVM_DEM_PAD_CELLS", PAD_CELLS)),
+                    help="margin in whole cells around the basin bbox "
+                         "(default %d = tight, like CA; env DHSVM_DEM_PAD_CELLS)"
+                         % PAD_CELLS)
     args = ap.parse_args()
 
-    prep_dem(args.src_dem, args.out_dem, args.watershed, args.res, args.epsg)
+    prep_dem(args.src_dem, args.out_dem, args.watershed, args.res, args.epsg,
+             args.pad_cells)
 
 
 if __name__ == "__main__":
