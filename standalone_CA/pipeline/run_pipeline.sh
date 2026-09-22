@@ -14,12 +14,13 @@
 #   2. slope  (GRASS)  slope_raw.tif       (run_slope_grass.sh)
 #      slope  (py)     slope_filled.tif    (stamp CRS + slope_fill + validate)
 #   3. bins            DHSVM_input_binaries/{dem,mask,soil,veg,soildepth_uniform_*}.bin
-#   4. hydrology       flow_acc/flow_dir/stream_raster.tif + streamfile.shp
+#   4. hydrology       flow_acc/flow_dir/stream_raster/stream_dir.tif + streamfile.shp
 #                      (hydrology.py runs run_hydrology_grass.sh internally + CRS stamp)
 #   5. soildepth       DHSVM_input_binaries/soildepth.bin
-#   6. vector_attrs    streamfile_attr.shp
-#      channelclass    DHSVM_input_streams/stream.class.dat (+chanclass write-back)
-#      stream_network  DHSVM_input_streams/stream.{network,map}.dat
+#   6. segments_from_raster  streamfile_attr.shp + segments.csv + stream_cells.csv
+#                             (Tier E: segments built from stream_raster + stream_dir)
+#      channelclass          DHSVM_input_streams/stream.class.dat (+chanclass write-back)
+#      network_files         DHSVM_input_streams/stream.{network,map}.dat
 #   7. states          modelstate/{Interception,Snow,Soil}.State... + Channel.State...
 #
 # Paths come from paths.py (env-overridable: DHSVM_INPUTS/REF/OUT/...). This
@@ -112,6 +113,7 @@ need "$BIN_DIR/mask.bin" "bins"
 step 4 "hydrology (GRASS chain + CRS stamp)"
 python3 hydrology.py
 need "$OUT/flow_acc.tif" "hydrology"
+need "$OUT/stream_dir.tif" "hydrology"
 need "$OUT/streamfile.shp" "hydrology"
 
 # ---------------------------------------------------------------- 5. soildepth
@@ -119,17 +121,18 @@ step 5 "soil depth"
 python3 soildepth.py
 need "$BIN_DIR/soildepth.bin" "soildepth"
 
-# ---------------------------------------------------------------- 6. vector chain
-step 6 "vector attributes"
-python3 vector_attrs.py
-need "$OUT/streamfile_attr.shp" "vector_attrs"
+# ---------------------------------------------------------------- 6. network chain
+step 6 "segments from the stream raster"
+python3 segments_from_raster.py
+need "$OUT/streamfile_attr.shp" "segments_from_raster"
+need "$OUT/stream_cells.csv" "segments_from_raster"
 step 6 "channel class + chanclass write-back"
 python3 channelclass_standalone.py
 need "$STREAMS_DIR/stream.class.dat" "channelclass"
 step 6 "stream network + map"
-python3 stream_network.py
-need "$STREAMS_DIR/stream.network.dat" "stream_network"
-need "$STREAMS_DIR/stream.map.dat" "stream_network"
+python3 network_files.py
+need "$STREAMS_DIR/stream.network.dat" "network_files"
+need "$STREAMS_DIR/stream.map.dat" "network_files"
 
 # ---------------------------------------------------------------- 7. states
 step 7 "initial states (grid + channel)"
