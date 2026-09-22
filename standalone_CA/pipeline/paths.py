@@ -52,6 +52,11 @@ STREAM_RASTER = OUT / "stream_raster.tif"
 STREAMFILE    = OUT / "streamfile.shp"       # stream vector (geometry only)
 # vector_attrs stage
 STREAMFILE_ATTR = OUT / "streamfile_attr.shp"
+# Tier E: the direction raster r.stream.extract followed, and the tables the
+# raster-native network stage writes (segments_from_raster.py)
+STREAM_DIR    = OUT / "stream_dir.tif"       # D8 direction of the streams
+SEGMENTS_CSV  = OUT / "segments.csv"         # per-segment attributes
+STREAM_CELLS  = OUT / "stream_cells.csv"     # one record per stream cell
 # soildepth stage
 SOILDEPTH_TIF = OUT / "soildepth.tif"        # diagnostic GeoTIFF (bin goes in BIN_DIR)
 
