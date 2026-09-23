@@ -92,18 +92,24 @@ independent of the pipeline's MFD routing by design, because the analysis yields
 a physical support area, and the area is the algorithm-independent quantity the
 pipeline consumes.
 
-The objective threshold, the smallest with absolute t below 2, is 50 cells,
-0.0396 km square. The passing band runs from 50 to 100 cells; every threshold in
-it satisfies the constant-drop law. The visual value of 60 cells, 0.0476 km
-square, falls inside this band at 0.83 times the objective minimum.
+Corrected on 2026-09-23 (docs/audit/drop_analysis_strahler_cache_2026_09_23.md):
+the sweep had reused the Strahler orders of its first threshold for every
+later one, through a cache in pyflwdir's stream_order, and the objective it
+reported (50 cells, band 50 to 100) was an artefact. With the order recomputed
+per threshold, the objective threshold, the start of the first band of three
+consecutive thresholds with absolute t below 2, is 120 cells, 0.0951 km
+square, and every threshold from 120 to 600 cells passes. Absolute t falls
+steadily from 8 at 10 cells to 2.8 at 60 cells and 1.9 at 120 cells. At 120
+cells the network has 17 streams, 9 of first order against 8 higher, so the
+test has little power there: on a basin of 4334 cells the criterion says where
+the law is violated (below about 100 cells) more firmly than where it holds.
 
-The visual threshold holds up against the objective method and is kept as the
-default. Setting it to 50 would be equally valid under the law but would change
-the network and require the byte-identical validation baseline to be rebuilt,
-which is not worth the move to an adjacent passing value. The drop analysis
-gives the visual choice an objective basis it did not have before. The sweep is
-saved to drop_sweep.csv and plotted in drop_sweep.png by
-diagnostics/plot_drop.py.
+The default of 60 cells, 0.0476 km square, is therefore a visual choice, at
+half the corrected objective, and does not satisfy the constant-drop law on CA
+at 28 m. It is kept as the default because it is the value the manuscript runs
+and the Tier E audit used; moving A_c changes the channel cell set and belongs
+with the manuscript's input-set decision. The sweep is saved to drop_sweep.csv
+and plotted in drop_sweep.png by diagnostics/plot_drop.py.
 
 ## Resolution dependence
 
@@ -116,6 +122,10 @@ is stable across the scale and rescaling is sound. Disagreement means the finer
 DEM reveals network structure the coarse one could not, which is itself a
 finding. The quick-look figure shows the difference between the two networks
 directly.
+
+The 10 m results once recorded here and in the validation log were computed
+with the cached orders described above and are withdrawn; the check was not
+repeated (2026-09-23).
 
 ## References
 

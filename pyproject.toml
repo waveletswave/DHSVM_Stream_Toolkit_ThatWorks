@@ -28,8 +28,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7", "pycodestyle>=2.11"]
-analysis = ["pyflwdir>=0.5", "matplotlib>=3.7"]
+dev = ["pytest>=7", "pycodestyle>=2.11", "pyflwdir>=0.5", "scipy>=1.10"]
+analysis = ["pyflwdir>=0.5", "scipy>=1.10", "matplotlib>=3.7"]
 
 [project.urls]
 Repository = "https://github.com/waveletswave/DHSVM_Stream_Toolkit_ThatWorks"
