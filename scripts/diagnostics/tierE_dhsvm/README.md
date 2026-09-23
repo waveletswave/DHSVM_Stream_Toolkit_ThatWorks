@@ -23,3 +23,10 @@ override.
 - `tierE_eval_CA.py`: the manuscript's streamflow metrics with the
   manuscript's own code, imported by path from
   `SpongeBurn/10_CA_Calib/DHSVM_CA_Stitch_Optimal_LAI_V2.py`.
+
+The AR versions (`tierE_rerun_AR.py`, `tierE_compare_AR.py`,
+`tierE_eval_AR.py`, 2026-09-23) do the same for the manuscript AR run
+(`AR_0416_S4h_UA.dhs`, prefix `S4h`, inputs `DEM_AR_0406`): control
+`oA_S4h`, Tier E `nA_S4h`, and `new_S4h` from the pipeline rerun on the
+April grid (`DEM_AR_tierE`). The AR evaluation imports the Fig 2a script
+`SpongeBurn/24_FIG2_DHSVM/10_fig5_CA_AR_unburned.py`.

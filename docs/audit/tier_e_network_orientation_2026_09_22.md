@@ -6,7 +6,8 @@
 **Commits**:
 - `0fc5fda` Export the r.stream.extract direction raster
 - `71b8a4c` Build the stream network from the raster
-- this commit: the audit record, the validation log entry, the README updates, the DHSVM rerun scripts, and the retirement of `iso_check_network.py`
+- `bf97b93` Record the Tier E network orientation audit (this record, the validation log entry, the README updates, the DHSVM rerun scripts, the retirement of `iso_check_network.py`)
+- the AR commit (2026-09-23): the AR regeneration and reruns below, the AR rerun scripts
 
 ## Context
 
@@ -100,6 +101,32 @@ At the manuscript's precision: 0.681 / 0.841 / 2.310 / -0.3 becomes 0.682 / 0.84
 
 **A DHSVM limit found on the way.** This DHSVM3.2 build crashes (SIGTRAP from the fortified `sprintf`) when the Output Directory value exceeds 78 characters: `InitDump.c` writes it into `char sumoutfile[100]` with `failure_summary.txt` appended, and `RouteSubSurface.c` into `char satoutfile[100]` with `saturation_extent.txt` (21 characters) appended. The rerun script enforces the limit.
 
+## AR (Arrowwood), 2026-09-23
+
+The manuscript's AR run (`AR_0416_S4h_UA.dhs`, output prefix `S4h`, Fig 2a) points at `DEM_AR_0406`, the April 2026 QGIS outputs on a 55 x 72 grid at 28.16 m (2870 valid cells); that tree was never rewritten, so it is the manuscript input set as it stands. Its network (30 segments, 201 map records over 172 cells, 20 cells under two segments, 2 cells not on the stream raster) has no `down 0` row at all, an in-degree of 13 at one node, and the max-|acc| cell in a headwater segment; the diagnostic fails I2 and I5. As on CA, the April run routed nothing (Stream.Flow outflow zero at every step, cumulative channel error 4.8e6 m3, the whole lateral inflow), and Fig 2a's Q is the lateral inflow.
+
+The pipeline was rerun on DCC (main at `eecd961`) with the April grid locked through `clip.py` (the April `elev_clipped.tif` as the reference footprint) and the default support area (47571.5 m2, 60 cells at this resolution, the value the April QGIS run used): `/work/ys451/dhsvm_ca/tierE/fixed_AR_28m`, the April tree staged as `/hpc/group/abmurraylab/ys451/dhsvm_ca/qgis_AR_ref`. dem, mask, soil, veg and the three grid state files came out byte-identical to April; `soildepth.bin` (262ca509.., the conditioned field), `stream.class.dat` (26983e53..), `stream.map.dat` (94cf4975..), `stream.network.dat` (9d5fdca8..) and `Channel.State` (b7276040..) are new. The new network: 19 segments, 170 map records on the 170 stream-raster cells, one outlet (segment 19, tail (53, 41) at 796.61 m, the lowest cell and the max-|acc| cell, 2602.6 cells), ranks dense 1 to 7, in-degree at most 2, classes 13 on 16 and 14 on 3, total length 5498.3 m. Diagnostic: 0 hard invariants failed.
+
+DHSVM reruns (`scripts/diagnostics/tierE_dhsvm/tierE_rerun_AR.py`, working copies in `TestCase/AR/`): the control `oA_S4h` (the template with the output prefix changed) reproduces the manuscript output byte for byte (all five files); `nA_S4h` swaps in the Tier E network and its Channel.State (the grid states are the same bytes); `new_S4h` takes every input from the pipeline rerun (conditioned soil depth and Tier E network). Mass.Final.Balance, mm, three years:
+
+| run | ET | ChannelInt | Initial Storage | Final Storage | Mass Error |
+|---|---|---|---|---|---|
+| S4h = oA_S4h | 2875.769 | 2124.688 | 651.039 | 1079.481 | 0.136 |
+| nA_S4h (network only) | 2875.726 | 2124.803 | 651.034 | 1079.409 | 0.140 |
+| new_S4h (pipeline outputs) | 2874.368 | 2120.513 | 629.089 | 1063.090 | 0.119 |
+
+Network effect on the daily lateral inflow: +0.108 mm over three years (+0.005%), daily RMSE 0.0055 mm/d, max 0.049 mm/d, r 0.999998. With one outlet, R12 is exact (the routed total is the outlet's outflow); the routed outflow equals ChannelInt (ratio 1.0000). The pipeline outputs move Q by -4.18 mm (-0.20%), daily RMSE 0.14 mm/d, max 2.24 mm/d, r 0.9977: the soil-depth conditioning is a larger change on AR than on CA (Initial Storage 651.0 to 629.1 mm).
+
+Fig 2a metrics with the figure's own code (`tierE_eval_AR.py` imports `10_fig5_CA_AR_unburned.py`; the S4h row reproduces the figure):
+
+| run | 2017 (Feb to Dec): NSE, r, RMSE, PBIAS | 2018: NSE, r, RMSE, PBIAS | overall 2017-02 to 2018-12: NSE, r, RMSE, PBIAS |
+|---|---|---|---|
+| S4h = oA_S4h | 0.298, 0.627, 0.916, +14.1 | 0.521, 0.728, 2.573, -8.5 | 0.600, 0.777, 1.964, -3.5 |
+| nA_S4h | 0.300, 0.627, 0.915, +14.1 | 0.522, 0.729, 2.570, -8.5 | 0.601, 0.777, 1.962, -3.5 |
+| new_S4h | 0.261, 0.596, 0.940, +10.7 | 0.529, 0.732, 2.551, -7.3 | 0.604, 0.779, 1.954, -3.3 |
+
+So the network moves the AR figure by 0.001 to 0.003, as on CA. The conditioned soil depth moves it more: the 2017 box goes from 0.30 / +14.1% to 0.26 / +10.7% and the 2018 box from 0.52 / -8.5% to 0.53 / -7.3%, overall 0.60 / -3.5% to 0.60 / -3.3%. Since the S4h parameter set was chosen on AR with the April soil depth, option 2 below would also mean re-checking that choice against the calibration candidates.
+
 ## Scope
 
 - Changed: `stream.class.dat`, `stream.network.dat`, `stream.map.dat`, `Channel.State` (segment count and widths), and the new `stream_dir.tif`, `segments.csv`, `stream_cells.csv`.
@@ -112,11 +139,11 @@ At the manuscript's precision: 0.681 / 0.841 / 2.310 / -0.3 becomes 0.682 / 0.84
 Two ways to carry this into the manuscript are on the table; Song and Brad decide.
 
 1. Keep the April runs as published and cite this audit: the network could not have changed any reported number beyond the third decimal, and the simulated Q never depended on routing.
-2. Rerun the CA trio on the current pipeline outputs (June soil depth, Tier E network) and refresh Fig 2 (0.683 / 0.842 / 2.305 / +0.4). Recommended: the published numbers then come from inputs the released toolkit reproduces.
+2. Rerun the CA trio and AR S4h on the current pipeline outputs (conditioned soil depth, Tier E network) and refresh Fig 2 (CA 0.683 / 0.842 / 2.305 / +0.4; AR overall 0.604 / 0.779 / 1.954 / -3.3, with the AR 2017 box moving from 0.30 / +14.1% to 0.26 / +10.7%). Recommended: the published numbers then come from inputs the released toolkit reproduces. The AR soil-depth change is large enough that the S4h selection among the calibration candidates should be re-checked on the new inputs before the figure is refreshed.
 
 ## Follow-ups
 
-- AR: regenerate the AR network with the fixed pipeline on the grid the manuscript AR run used (the AR reference network was built by the same stage) and rerun AR S4h. The AR source DEM and polygon have to be restaged on DCC first.
+- AR is done (section above); the AR reference tree now lives on DCC as `qgis_AR_ref` and the AR polygon in `dhsvm_ca/inputs/`.
 - The joint-tool plan: port the drop analysis to WW-DHSVM and cross-compare both engines on CA and AR.
 - Recorded alternatives, not adopted: segment slope as drop over length instead of the mean tan(slope raster); a forced single outlet.
 
@@ -124,6 +151,6 @@ Two ways to carry this into the manuscript are on the table; Song and Brad decid
 
 - Fix: `standalone_CA/pipeline/run_hydrology_grass.sh`, `hydrology.py`, `paths.py`, `segments_from_raster.py`, `network_files.py`, `run_pipeline.sh`.
 - Tests and diagnostics: `standalone_CA/tests/test_segments_from_raster.py`, `standalone_CA/diagnostics/check_network_orientation.py`.
-- DHSVM reruns: `scripts/diagnostics/tierE_dhsvm/`.
+- DHSVM reruns: `scripts/diagnostics/tierE_dhsvm/` (CA and AR).
 - Retired: `scripts/legacy/standalone_CA_pre_tierE/` (`vector_attrs.py`, `stream_network.py`, `iso_check_network.py`).
 - Working records: the project documents TIER_E_NETWORK_ORIENTATION_PLAN, TIER_E_DIAGNOSTIC_RESULTS, TIER_E_FIXED_RUN and TIER_E_MAC_RERUN of 2026-09-22.
