@@ -1,0 +1,3 @@
+# The CA 28 m regression fixtures are versioned on purpose (about 250 KB);
+# the parent .gitignore would otherwise drop every GeoTIFF.
+!*.tif

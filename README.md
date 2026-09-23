@@ -51,13 +51,22 @@ The code under `standalone_CA/` is grouped by role.
 - `check_network_orientation.py`: read-only check that the written network drains downhill to the basin mouth (the Tier E invariants)
 - `plot_drop.py`, `iso_check_*.py`, `check_slope_units.py`: the drop-sweep plot and the isolation checks
 
-**`tests/`** holds the synthetic tests of the network stage (`test_segments_from_raster.py`, no GRASS needed).
+**`tests/`** holds the tests, none of which need GRASS: the synthetic tests of the network stage (`test_segments_from_raster.py`, `test_network_files.py`) and the CA 28 m regression (`test_ca28m_regression.py`, with its rasters and the audited stream files under `tests/fixtures/CA_28m/`).
 
 **`run/`** generates the DHSVM run configuration.
 
 - `make_dhsvm_config.py`, `area.py`, `CA.dhs.template`: render the DHSVM .dhs config, with a DEM-derived [AREA] block and a declared meridian
 
 **`docs/`** holds the documentation: `validation_log.md`, `NEW_WATERSHED_GUIDE.md`, `DCC_SETUP.md`, `BUILD_DCC.md`, and `stream_threshold.md`.
+
+### Installing it
+
+`pyproject.toml` carries the Python dependencies (numpy, rasterio, geopandas, shapely, pandas) and the test tooling; the pipeline itself stays a set of scripts under `standalone_CA/pipeline/`, run through `run_pipeline.sh`, not an importable package. GRASS GIS is needed on the machine for the slope and hydrology stages (see `standalone_CA/docs/DCC_SETUP.md`).
+
+```bash
+python -m pip install -e ".[dev]"        # dependencies plus pytest and pycodestyle
+python -m pip install -e ".[analysis]"   # pyflwdir and matplotlib for drop_analysis and the figures
+```
 
 ### Running it
 
@@ -79,6 +88,14 @@ python3 standalone_CA/diagnostics/quicklook.py --run-dir "$DHSVM_OUT" --boundary
 ```
 
 To reproduce the development basin's calibrated 28 m grid for the regression test, use `clip.py` as the entry instead of `prep_dem.py`, then run the pipeline.
+
+## Tests
+
+```bash
+python -m pytest
+```
+
+runs 28 tests in under a second: the network stage on synthetic grids (topology, ranks, two outlets, negative direction codes, a cycle, the end-to-end file formats), the invariant check and the writers of the stream files on synthetic networks, and the CA 28 m regression, which reruns `segments_from_raster.py`, `channelclass_standalone.py` and `network_files.py` on the real GRASS-stage rasters of Camp Branch and requires `segments.csv` and `stream_cells.csv` to agree value by value and `stream.class.dat`, `stream.map.dat` and `stream.network.dat` to be byte-identical to the files the audited DHSVM reruns used (`standalone_CA/tests/fixtures/CA_28m/README.md`). GitHub Actions runs the same suite on Python 3.11 and 3.12 for every push and pull request (`.github/workflows/tests.yml`). A deliberate change to the network stage means regenerating the expected files and recording why in the validation log.
 
 ## Validation
 

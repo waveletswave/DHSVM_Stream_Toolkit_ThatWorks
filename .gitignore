@@ -36,3 +36,10 @@ __pycache__/
 # ==========================================
 Reprojected_DEM/
 Reprojected_Watersheds/
+
+# ==========================================
+# Packaging and test tooling
+# ==========================================
+*.egg-info/
+.pytest_cache/
+build/
