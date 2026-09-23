@@ -72,6 +72,7 @@ The pipeline has been through several correctness audits, recorded in [`../docs/
 - **Tier B** (slope units): `r.slope.aspect` output switched from percent (`format=1`) to degrees (`format=0`), with the consumer's raster `sample()` unpacking fixed to match. See `tier_b_unit_fix_2026_05_12.md`.
 - **Slope conditioning** (2026-06-08): the slope-completeness fix in step 6 above. `soildepthscript` previously filled the missing-slope ring with slope 0, which receives the maximum slope bonus in the depth formula and produced a spurious deep ring at the basin edge. `slope_fill.py` fills those cells with the neighbour mean instead. See `slope_conditioning_2026_06_08.md`.
 - **Tier D** (Row/Col origin): Row/Col uses a top-left origin throughout, and the unused `rowcolmap.py` and `roadaspect.py` were archived (see `_archive/` below).
+- **Tier E** (stream network orientation, 2026-09-22, not fixed here): step 7 takes the endpoint with the larger raw `r.watershed` accumulation as downstream, but on a basin-clipped DEM that accumulation is negative on every cell, so every segment is written upstream and the sink merge makes a headwater the outlet. The standalone pipeline now builds the network from the stream raster and the `r.stream.extract` direction raster instead; this implementation keeps the defect and stays as the reference of record. See `docs/audit/tier_e_network_orientation_2026_09_22.md`.
 
 ## Row/Col origin convention
 

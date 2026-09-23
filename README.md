@@ -16,7 +16,7 @@ The standalone version uses `rasterio` + `geopandas` + `shapely` + `pyflwdir` an
 - `standalone_CA/`: the current pipeline (CLI / HPC). See below.
 - `qgis_CA/`: the original QGIS Python Console scripts and its own `README.md`.
 - `scripts/`: archived material. `legacy/` holds earlier QGIS and standalone versions of the scripts, and `diagnostics/` holds one-off analysis utilities. `README_legacy_v0.md` documents the older layout.
-- `docs/audit/`: the audit trail. The standalone rebuild inventory and the per-stage audits (slope conditioning, soil-depth sensitivity, the Tier B unit fix).
+- `docs/audit/`: the audit trail. The standalone rebuild inventory and the per-stage audits (slope conditioning, soil-depth sensitivity, the Tier B unit fix, the Tier E network orientation fix).
 - `example_outputs/`: a sample stream-profile figure and its data.
 - `DHSVM_Workflow_merged.tex` and `Workflow_for_Preparing_DHSVM_Input_Files_...pdf`: the written narrative of the full workflow.
 
@@ -36,9 +36,9 @@ The code under `standalone_CA/` is grouped by role.
 - `clip.py`: CA 28 m byte-match reproducer for the regression test
 - `slope.py`, `slope_fill.py`: GRASS r.slope.aspect, then CRS stamp and fill conditioning
 - `bins.py`: dem / mask / soil / veg binaries plus uniform soil-depth baselines
-- `hydrology.py`: GRASS r.watershed, r.stream.extract, r.to.vect (flow, stream raster, stream vector)
+- `hydrology.py`: GRASS r.watershed, r.stream.extract, r.to.vect (flow, stream raster, stream direction, stream vector)
 - `soildepth.py`: dynamic soil depth from the PNNL weighting
-- `vector_attrs.py`, `channelclass_standalone.py`, `stream_network.py`: stream attributes, then stream.class.dat, stream.network.dat, and stream.map.dat
+- `segments_from_raster.py`, `channelclass_standalone.py`, `network_files.py`: stream segments walked from the stream raster and its direction raster, then stream.class.dat, stream.network.dat (SAVE on every outlet row), and stream.map.dat
 - `states.py`: initial Interception / Snow / Soil / Channel states
 - `paths.py`: single source of truth for paths and config, env-overridable
 - `run_pipeline.sh`: the one-command orchestrator, fail-fast; the GRASS stages are `run_slope_grass.sh` and `run_hydrology_grass.sh`
@@ -48,7 +48,10 @@ The code under `standalone_CA/` is grouped by role.
 
 - `quicklook.py`: six-panel diagnostic figure (DEM with network, soil depth, slope, flow, location)
 - `drop_analysis.py`: constant stream drop analysis to pick the stream support area A_c
+- `check_network_orientation.py`: read-only check that the written network drains downhill to the basin mouth (the Tier E invariants)
 - `plot_drop.py`, `iso_check_*.py`, `check_slope_units.py`: the drop-sweep plot and the isolation checks
+
+**`tests/`** holds the synthetic tests of the network stage (`test_segments_from_raster.py`, no GRASS needed).
 
 **`run/`** generates the DHSVM run configuration.
 
@@ -79,7 +82,9 @@ To reproduce the development basin's calibrated 28 m grid for the regression tes
 
 ## Validation
 
-The standalone pipeline was validated against the audited QGIS reference on the CA (Camp Branch) test case, stage by stage and end to end. Grid binaries are byte-identical to the reference; rasters are checked for data equivalence, since GRASS and rasterio write different TIFF containers; the stream network is verified against DHSVM's topological requirements rather than the QGIS tie-break. End to end, hourly streamflow over 2016 to 2018 is numerically equivalent to the QGIS pipeline (NSE 0.99999510, PBIAS -0.000059 percent). The two input sets differ only in two documented numerical respects, a 1-ULP float difference in soil depth and a tie-break in stream extraction, which leave every aggregate metric unchanged. Portability was confirmed by building a full input set on a second basin, AR (Arrowwood), at 10 m and 30 m from its polygon alone. The full record is in `standalone_CA/docs/validation_log.md`.
+The standalone pipeline was validated against the audited QGIS reference on the CA (Camp Branch) test case, stage by stage and end to end. Grid binaries are byte-identical to the reference; rasters are checked for data equivalence, since GRASS and rasterio write different TIFF containers. End to end, hourly streamflow over 2016 to 2018 is numerically equivalent to the QGIS pipeline (NSE 0.99999510, PBIAS -0.000059 percent), the two input sets differing only in a 1-ULP float difference in soil depth and in the stream network. Portability was confirmed by building a full input set on a second basin, AR (Arrowwood), at 10 m and 30 m from its polygon alone.
+
+The stream network is no longer validated against the QGIS reference: in September 2026 the network stage shared by both implementations was found to write every segment upstream, with a headwater as the outlet, and was rebuilt from the stream raster and its flow-direction raster (Tier E). The corrected network is verified by invariants (every segment drains downhill to a basin mouth, dense stream order, one map record per stream cell) and by DHSVM reruns of the manuscript configurations, in which the network moves three-year streamflow by at most 0.005 percent and the calibration metrics by 0.001. The full record is in `standalone_CA/docs/validation_log.md` and `docs/audit/tier_e_network_orientation_2026_09_22.md`.
 
 ## Output directory structure
 
@@ -97,6 +102,7 @@ The standalone pipeline was validated against the audited QGIS reference on the 
 - **Single source of truth for paths.** Every stage reads `paths.py`, with env-overridable roots, so a case or machine change needs only the `DHSVM_*` variables. Both the Python and the GRASS shell layers are parameterized.
 - **One-command orchestration.** `run_pipeline.sh` runs the full pipeline fail-fast and was verified to match a step-by-step run byte for byte.
 - **Top-left origin convention.** Row/Col assignment uses the top-left origin `stream.map.dat` requires. The earlier bottom-left version is preserved under `scripts/legacy/` and is deprecated.
+- **Raster-native stream network.** Segments are walked from the stream raster along the direction `r.stream.extract` computed, so orientation, confluences and outlets come from the flow field rather than from line geometry; outlets are written with `SAVE` so DHSVM records them. The earlier geometric stage is preserved under `scripts/legacy/standalone_CA_pre_tierE/` and is deprecated.
 
 ## The QGIS implementation (`qgis_CA/`)
 

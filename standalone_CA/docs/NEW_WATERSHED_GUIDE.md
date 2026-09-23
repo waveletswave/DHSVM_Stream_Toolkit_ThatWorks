@@ -137,7 +137,7 @@ python3 standalone_CA/diagnostics/quicklook.py \
         --title "$DHSVM_CASE  ${DHSVM_DEM_RES} m  pipeline quick-look"
 ```
 
-This is a diagnostic for catching gross geometric errors, not a validation gate. Check that the stream network sits in the valleys, the boundary hugs the basin, flow accumulation concentrates toward the outlet, the basin fills most of the frame (the DEM panel title reports the basin's data fraction), and the location panel puts the basin where you expect. Run it on a node with internet if you want the cartopy basemap on the location panel; without internet or cartopy it falls back to a plain lon/lat graticule.
+This is a diagnostic for catching gross geometric errors, not a validation gate. For the network itself run `python3 standalone_CA/diagnostics/check_network_orientation.py --pipeline-dir "$DHSVM_OUT"`: it walks the written segments along the direction raster and confirms that every segment drains downhill, that the lowest stream cell lies in an outlet segment, and that the outlet rows of stream.network.dat (down 0, SAVE) are the basin mouth cells; a basin can legitimately have more than one mouth cell. Check that the stream network sits in the valleys, the boundary hugs the basin, flow accumulation concentrates toward the outlet, the basin fills most of the frame (the DEM panel title reports the basin's data fraction), and the location panel puts the basin where you expect. Run it on a node with internet if you want the cartopy basemap on the location panel; without internet or cartopy it falls back to a plain lon/lat graticule.
 
 To run a second resolution, repeat all four steps with a new `DHSVM_OUT`, `DHSVM_DEM_RES`, and its own fetched DEM, and re-derive A_c for that resolution.
 
