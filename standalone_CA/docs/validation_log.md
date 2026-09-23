@@ -200,6 +200,8 @@ Both networks are valid DHSVM drainage networks: a single outlet (segment 41, do
 
 ## Resolution test: A_c at 10 m
 
+Withdrawn 2026-09-23: every drop-analysis objective in this section was computed with the Strahler orders of the first threshold reused for all the others (pyflwdir's stream_order cache; docs/audit/drop_analysis_strahler_cache_2026_09_23.md). The corrected CA 28 m objective is 120 cells, 0.0951 km2; the 10 m analysis was not repeated. The text below is kept as the record of what was done.
+
 The physical-area stream threshold (line A) predicts that holding the support area A_c fixed, rather than the cell count, keeps the extracted network in the same geomorphic regime as grid resolution changes. This was tested by repeating the channel-initiation analysis on a 10 m DEM.
 
 The 10 m DEM is the USGS 3DEP 1/3 arc-second tile n36w084 (NAD83 geographic, ~10 m native), reprojected to EPSG:32617 on a clean 10 m grid by bilinear resampling and masked to the watershed (prep/prep_dem_10m.py). Masking before routing matters: drop_analysis routes the whole raster, so an unmasked tile would draw in neighbouring drainage and the comparison would mix domain extent with resolution. The valid cell count scales as expected, 4334 at 28 m to 34347 at 10 m, a factor of 7.92 that matches (28.16/10)^2, confirming the same watershed at a finer grid.
@@ -229,6 +231,8 @@ The 28 m pipeline reproducibility is unaffected. Standalone versus QGIS at 28 m 
 One minor accounting note. The evaluation divides the outlet volume by a fixed basin area of 3.436e6 m2 for all runs. The 10 m valid area is 3.4347e6 m2, about 0.04 percent smaller, which shifts the 10 m Q by well under a tenth of a percent and does not change any conclusion.
 
 ## Portability: AR (Arrowwood), tight-clip, 10 m and 30 m
+
+Note 2026-09-23: the drop-analysis objectives used as A_c in this section (220 cells at 10 m, 100 cells at 30 m) carry the cache defect recorded in docs/audit/drop_analysis_strahler_cache_2026_09_23.md and are no longer called objective; the pipeline runs and the portability conclusion (a valid input set from the polygon alone at both resolutions) stand at those thresholds as chosen values.
 
 The pipeline was run end to end on a second watershed, AR (Arrowwood), a Coweeta basin adjacent to Camp Branch, at 10 m and 30 m. The aim is a portability check on the general entry point, fetch_dem and prep_dem, rather than a reproduction of the QGIS reference, so the acceptance criterion is a valid DHSVM input set on an arbitrary basin, not byte-identity against CA. The reference-comparison stages still run and still report no match against the CA reference, which is diagnostic only on a different basin and a different resolution.
 
@@ -267,3 +271,7 @@ Two other things surfaced on the way and are recorded in the audit: the April ma
 AR (2026-09-23), on the manuscript's 55 x 72 grid locked through clip.py with the April elev_clipped.tif as the reference footprint: the April AR network (30 segments, no down 0 row, in-degree 13 at one node, 20 cells under two segments) fails the same invariants; the raster-native stage gives 19 segments on 170 cells with one outlet at the lowest and max-|acc| cell, ranks 1 to 7, classes 13 and 14; dem, mask, soil, veg and the grid states byte-identical to April. DHSVM: the control rerun reproduces the manuscript AR S4h byte for byte; the network alone moves three-year Q by +0.108 mm (+0.005%, daily RMSE 0.005 mm/d) and the Fig 2a metrics by 0.001 to 0.003; the current pipeline outputs (conditioned soil depth plus the network) move Q by -4.18 mm (-0.20%) and the 2017 box from NSE 0.30 / PBIAS +14.1% to 0.26 / +10.7%, overall 0.600 / -3.5% to 0.604 / -3.3%. Details in the audit.
 
 Regression test (2026-09-23): `standalone_CA/tests/test_ca28m_regression.py` reruns segments_from_raster, channelclass_standalone and network_files on the CA 28 m GRASS-stage rasters of the fixed run (`tests/fixtures/CA_28m/`, sha256 recorded in its README) and requires segments.csv and stream_cells.csv to agree value by value and the three stream files to be byte-identical to the DEM_CA_tierE files above (26983e53.., a4f0f02e.., 6a01bd2f..). It passed on numpy 2.4 / rasterio 1.4.4 / geopandas 1.1.4 and runs in GitHub Actions on Python 3.11 and 3.12 (`.github/workflows/tests.yml`). A deliberate change to the network stage regenerates `tests/fixtures/CA_28m/expected/` and is recorded here.
+
+## Drop analysis: Strahler order cache (2026-09-23)
+
+`diagnostics/drop_analysis.py` reused the Strahler orders of its first threshold for every later one (pyflwdir's `stream_order` caches the map and ignores the mask on later calls, 0.5.5 to 0.5.12). Fixed by computing the order with `pyflwdir.streams.strahler_order` per threshold. On the CA 28 m fixture the corrected objective is 120 cells (0.0951 km2; band 120 to 600; abs t 2.80 at the 60-cell default), not 50 cells; the earlier CA 10 m and AR 10 m / 30 m objectives are withdrawn. The default A_c stays at 60 cells as a visual choice. `tests/test_drop_analysis.py` pins the corrected sweep. Record: docs/audit/drop_analysis_strahler_cache_2026_09_23.md.

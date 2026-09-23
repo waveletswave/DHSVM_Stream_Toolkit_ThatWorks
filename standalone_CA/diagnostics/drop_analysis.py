@@ -25,6 +25,14 @@
 # pipeline consumes that area and computes its own cell threshold with its own
 # routing and cell size. A_c is the bridge between the two.
 #
+# Strahler order is computed afresh for every threshold with
+# pyflwdir.streams.strahler_order. FlwdirRaster.stream_order (pyflwdir 0.5.5
+# through 0.5.12) caches the order map on the object and returns the cached
+# map on every later call whatever mask is passed, so a sweep that called it
+# once per threshold got the orders of the first (densest) network for all
+# the others. That is what happened to every objective recorded before
+# 2026-09-23 (docs/audit/drop_analysis_strahler_cache_2026_09_23.md).
+#
 # Output:
 #   - a table to stdout: threshold, cells, area, drainage density, |t|, pass
 #   - the objective threshold and its A_c. If a reference area is given (via
@@ -84,6 +92,19 @@ def build_flow(elev, nodata, transform):
     return flw
 
 
+def strahler_order(flw, stream_mask):
+    """Strahler order of the streams in stream_mask, recomputed for this mask.
+
+    Calls pyflwdir.streams.strahler_order directly instead of
+    flw.stream_order, which caches its first result and ignores the mask on
+    later calls (pyflwdir 0.5.5 to 0.5.12).
+    """
+    from pyflwdir import streams as pf_streams
+    mask = np.asarray(stream_mask, dtype=bool).ravel()
+    strord = pf_streams.strahler_order(flw.idxs_ds, flw.idxs_seq, mask=mask)
+    return np.asarray(strord).reshape(flw.shape)
+
+
 def stream_drops(flw, elev_flat, stream_mask, strord):
     """Drop of every stream segment: elev at head minus elev at outlet.
 
@@ -141,7 +162,7 @@ def evaluate_threshold(flw, elev, transform, uparea_cells, cell_area,
     n_stream_cells = int(stream_mask.sum())
     if n_stream_cells < 2:
         return None
-    strord = flw.stream_order(type="strahler", mask=stream_mask)
+    strord = strahler_order(flw, stream_mask)
     segs = stream_drops(flw, elev, stream_mask, strord)
     rows = drops_from_coords(segs, elev, transform)
     if not rows:
