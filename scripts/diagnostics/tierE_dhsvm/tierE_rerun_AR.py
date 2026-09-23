@@ -55,11 +55,18 @@ OLD_ROOT = Path(os.environ.get(
 NEW_ROOT = Path(os.environ.get(
     "TIERE_NEW_ROOT",
     "/Users/benthosyy/Desktop/CreateStreamNetwork_PythonV/DEM_AR_tierE"))
+# the WW-DHSVM network built on the same grid, DEM and A_c (cross-engine
+# comparison, scripts/diagnostics/cross_engine/compare_engines.py,
+# 2026-09-23): three stream files, its Channel.State, and copies of the
+# grid states
+WW_ROOT = Path(os.environ.get(
+    "TIERE_WW_ROOT",
+    "/Users/benthosyy/Desktop/CodeBits/DHSVM-PNNL-2025/TestCase/AR/DEM_AR_ww"))
 
 RUNS = {"AR_S4h": "AR_0416_S4h_UA.dhs"}
 TAGS = {"AR_S4h": "S4h"}
-KINDS = ["ctrl", "tierE", "new"]
-WORDS = {"ctrl": "oA", "tierE": "nA", "new": "new"}
+KINDS = ["ctrl", "tierE", "new", "ww"]
+WORDS = {"ctrl": "oA", "tierE": "nA", "new": "new", "ww": "wA"}
 MAX_OUTPUT_PATH = 78        # see the header
 
 
@@ -122,6 +129,18 @@ EXPECTED_SHA_NEW.update({
     "DHSVM_input_binaries/soildepth.bin":
         "262ca509decd739aef37f46a2ed07297d3dbdf9afa172ee9618810c48c922a34",
 })
+# sha256 of the WW-DHSVM network on the AR grid at A_c 47571.5 m2
+# (compare_engines.py, WW-DHSVM fork feat-channel-initiation, 2026-09-23)
+EXPECTED_SHA_WW = {
+    "DHSVM_input_streams/stream.class.dat":
+        "696ebf8beab15040fc16d8d53fb50c57c6ac2ef8a1ddc99a187ba3c7fa5a26aa",
+    "DHSVM_input_streams/stream.map.dat":
+        "0413270a3e800c4a35983a6a01117efbebe8ed6011136afecea3a8afd761dfc7",
+    "DHSVM_input_streams/stream.network.dat":
+        "3ce3cac9365a968225f3e2bcc6602a0fce3d66a8c21b17c396de96fa00d8c82c",
+    "modelstate/Channel.State.01.01.2016.00.00.00":
+        "b6ec8f314c5fd517c0c6221ce29dfe01035944ad106c70e504871a59d3e6afb3",
+}
 GRID_STATES = ["Interception.State.01.01.2016.00.00.00.bin",
                "Snow.State.01.01.2016.00.00.00.bin",
                "Soil.State.01.01.2016.00.00.00.bin"]
@@ -163,6 +182,17 @@ def check_inputs(kinds, sha=True):
                 sha256(NEW_ROOT / "modelstate" / name), \
                 f"{name} differs between DEM_AR_0406 and DEM_AR_tierE"
             print(f"  ok  modelstate/{name} identical in both trees")
+    if "ww" in kinds:
+        check_tree(WW_ROOT, EXPECTED_SHA_WW,
+                   "DEM_AR_ww (WW-DHSVM network, compare_engines.py)", sha)
+        for name in GRID_STATES:
+            new = WW_ROOT / "modelstate" / name
+            assert new.exists(), \
+                f"missing {new}: copy it from {OLD_ROOT / 'modelstate'}"
+            assert sha256(OLD_ROOT / "modelstate" / name) == sha256(new), \
+                f"{name} differs between DEM_AR_0406 and DEM_AR_ww"
+            print(f"  ok  DEM_AR_ww/modelstate/{name} identical to "
+                  "DEM_AR_0406")
     assert DHSVM_EXE.exists(), f"DHSVM executable not found: {DHSVM_EXE}"
 
 
@@ -199,13 +229,14 @@ def make_config(run, template, kind, smoke):
             text, changed[key] = set_line(text, key, str(NEW_ROOT / rel),
                                           tag)
         n_expected += 5
-    if kind in ("tierE", "new"):
+    if kind in ("tierE", "new", "ww"):
+        net_root = WW_ROOT if kind == "ww" else NEW_ROOT
         for key, rel in STREAM_KEYS:
-            text, changed[key] = set_line(text, key, str(NEW_ROOT / rel),
+            text, changed[key] = set_line(text, key, str(net_root / rel),
                                           tag)
         text, changed["Initial State Directory"] = set_line(
             text, "Initial State Directory",
-            str(NEW_ROOT / "modelstate") + "/", tag)
+            str(net_root / "modelstate") + "/", tag)
         n_expected += 4
     out_prefix = CASE / "output" / prefix
     assert len(str(out_prefix)) <= MAX_OUTPUT_PATH, (
@@ -276,7 +307,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", nargs="+", default=list(RUNS),
                     choices=list(RUNS))
-    ap.add_argument("--kinds", nargs="+", default=KINDS, choices=KINDS,
+    ap.add_argument("--kinds", nargs="+", default=KINDS[:3], choices=KINDS,
                     help="ctrl (April inputs), tierE (April inputs, Tier E "
                          "network), new (current pipeline outputs)")
     ap.add_argument("--smoke", action="store_true",

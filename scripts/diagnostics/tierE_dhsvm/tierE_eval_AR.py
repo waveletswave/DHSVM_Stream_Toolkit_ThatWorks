@@ -34,7 +34,7 @@ FIG_SCRIPT = Path(os.environ.get(
     "TIERE_FIG_SCRIPT",
     "/Users/benthosyy/Desktop/CodeBits/DHSVM-PNNL-2025/TestCase/LAI/"
     "SpongeBurn/24_FIG2_DHSVM/10_fig5_CA_AR_unburned.py"))
-PREFIXES = ["S4h", "oA_S4h", "nA_S4h", "new_S4h"]
+PREFIXES = ["S4h", "oA_S4h", "nA_S4h", "new_S4h", "wA_S4h"]
 METRICS = ("NSE", "r", "RMSE", "PBIAS")
 
 

@@ -94,6 +94,7 @@ interception term, and belongs with the manuscript's input-set decision.
 
 ## Upstream
 
-pyflwdir issue to be filed with a two-mask reproducer (call `stream_order`
-with a dense mask, then a sparse one; the second call returns the first
-map). WW-DHSVM is not affected: it computes Strahler order itself.
+Filed as https://github.com/Deltares/pyflwdir/issues/123 (2026-09-23)
+with a two-mask reproducer (call `stream_order` with a dense mask, then a
+sparse one; the second call returns the first map) and the one-line fix.
+WW-DHSVM is not affected: it computes Strahler order itself.

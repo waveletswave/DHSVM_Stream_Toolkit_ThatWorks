@@ -144,7 +144,7 @@ Two ways to carry this into the manuscript are on the table; Song and Brad decid
 ## Follow-ups
 
 - AR is done (section above); the AR reference tree now lives on DCC as `qgis_AR_ref` and the AR polygon in `dhsvm_ca/inputs/`.
-- The joint-tool plan: port the drop analysis to WW-DHSVM and cross-compare both engines on CA and AR.
+- The joint-tool plan: port the drop analysis to WW-DHSVM and cross-compare both engines on CA and AR. Done 2026-09-23: `cross_engine_comparison_2026_09_23.md` (the engines agree on the trunk, differ in the headwaters, and DHSVM is within 0.08% of Q either way).
 - Recorded alternatives, not adopted: segment slope as drop over length instead of the mean tan(slope raster); a forced single outlet.
 
 ## Files

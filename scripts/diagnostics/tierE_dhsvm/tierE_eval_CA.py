@@ -47,6 +47,7 @@ BASES = {
     "new": ("new_S4h", "new_LAI70", "new_LAI20"),
     "oA": ("oA_S4h", "oA_LAI70", "oA_LAI20"),
     "nA": ("nA_S4h", "nA_LAI70", "nA_LAI20"),
+    "wA": ("wA_S4h", "wA_LAI70", "wA_LAI20"),     # WW-DHSVM network, apr base
 }
 YEARS = {"2017": ("2017-01-01", "2017-12-31"),
          "2018": ("2018-01-01", "2018-12-31")}

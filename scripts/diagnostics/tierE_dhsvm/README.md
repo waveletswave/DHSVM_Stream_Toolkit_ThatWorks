@@ -30,3 +30,14 @@ The AR versions (`tierE_rerun_AR.py`, `tierE_compare_AR.py`,
 `oA_S4h`, Tier E `nA_S4h`, and `new_S4h` from the pipeline rerun on the
 April grid (`DEM_AR_tierE`). The AR evaluation imports the Fig 2a script
 `SpongeBurn/24_FIG2_DHSVM/10_fig5_CA_AR_unburned.py`.
+
+The `ww` kind (2026-09-23, prefix `wA_`) runs the same April inputs with
+the WW-DHSVM network of the cross-engine comparison
+(`docs/audit/cross_engine_comparison_2026_09_23.md`): the three stream
+files and the `Channel.State` from `compare_engines.py`, placed in
+`TestCase/CA/DEM_CA_ww/` and `TestCase/AR/DEM_AR_ww/` with the April grid
+states copied beside them (sha256-checked against the April set). CA:
+`python3 tierE_rerun_CA.py --base apr --kinds ww`; AR:
+`python3 tierE_rerun_AR.py --kinds ww`. The compare scripts add the
+control-versus-WW and Tier-E-versus-WW sections when the `wA_` outputs
+exist, and the evaluation scripts take `wA` as a base or prefix.
