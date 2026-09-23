@@ -86,22 +86,31 @@ NEW_ROOT = Path(os.environ.get(
 APR_ROOT = Path(os.environ.get(
     "TIERE_APR_ROOT",
     "/Users/benthosyy/Desktop/CreateStreamNetwork_PythonV/DEM_CA_apr"))
+# the WW-DHSVM network built on the same grid, DEM and A_c (cross-engine
+# comparison, scripts/diagnostics/cross_engine/compare_engines.py,
+# 2026-09-23): three stream files, its Channel.State, and copies of the
+# grid states
+WW_ROOT = Path(os.environ.get(
+    "TIERE_WW_ROOT",
+    "/Users/benthosyy/Desktop/CodeBits/DHSVM-PNNL-2025/TestCase/CA/DEM_CA_ww"))
 
 RUNS = {"CA_S4h": "CA_prefire_S4h.dhs",
         "CA_LAI70": "CA_LAI70.dhs",
         "CA_LAI20": "CA_LAI20.dhs"}
 TAGS = {"CA_S4h": "S4h", "CA_LAI70": "LAI70", "CA_LAI20": "LAI20"}
-KINDS = ["ctrl", "tierE"]
+KINDS = ["ctrl", "tierE", "ww"]
 # prefix words per base: old/new network on today's inputs (jun), oA/nA
-# on the April inputs (apr)
-WORDS = {"jun": {"ctrl": "old", "tierE": "new"},
-         "apr": {"ctrl": "oA", "tierE": "nA"}}
+# on the April inputs (apr); ww/wA for the WW-DHSVM network
+WORDS = {"jun": {"ctrl": "old", "tierE": "new", "ww": "ww"},
+         "apr": {"ctrl": "oA", "tierE": "nA", "ww": "wA"}}
+NET_ROOTS = {"tierE": None, "ww": None}     # filled below
 MAX_OUTPUT_PATH = 78        # see the header
 
 
 def prefix_for(kind, run, smoke, base="jun"):
     """Output prefix (the last path element of Output Directory), at
-    most 9 characters: old_S4h, new_LAI70, oldsm_S4h, oA_S4h, nA_LAI20"""
+    most 9 characters: old_S4h, new_LAI70, oldsm_S4h, oA_S4h, nA_LAI20,
+    wA_S4h"""
     return f"{WORDS[base][kind]}{'sm' if smoke else ''}_{TAGS[run]}"
 
 
@@ -124,6 +133,22 @@ EXPECTED_SHA_NEW = {
     "modelstate/Channel.State.01.01.2016.00.00.00":
         "819fa1f74422bb8e3404f47cdd02221a8957fcf3cb05acb89ca21cd41a24cb1f",
 }
+# sha256 of the WW-DHSVM network on the CA 28 m grid at A_c 47571.5 m2
+# (compare_engines.py, WW-DHSVM fork feat-channel-initiation, 2026-09-23)
+EXPECTED_SHA_WW = {
+    "DHSVM_input_streams/stream.class.dat":
+        "8e99b33ae558a55be2ef314c56e11b013788d2243d11781923abfbbbc5c49282",
+    "DHSVM_input_streams/stream.map.dat":
+        "22d4dddb3edebefac2106c5a5b674160ab7c9d816e989e44d2fa3e8b21a7806e",
+    "DHSVM_input_streams/stream.network.dat":
+        "890970f541bfbc55cf7d8d5aab762d3a491310756aa7b773e46c61daffa282fd",
+    "modelstate/Channel.State.01.01.2016.00.00.00":
+        "28ae1384931059061e5fe9834202a50dedce5a65967df295bdfdb5ecf24c00d8",
+}
+NET_ROOTS = {"tierE": (NEW_ROOT, EXPECTED_SHA_NEW,
+                       "Tier E network (DCC fixed_CA_28m)"),
+             "ww": (WW_ROOT, EXPECTED_SHA_WW,
+                    "WW-DHSVM network (compare_engines.py)")}
 # sha256 of the DEM_CA_0406 files the manuscript runs point at, equal to
 # the QGIS reference tree on DCC (qgis_CA_ref), checked 2026-09-22
 EXPECTED_SHA_OLD = {
@@ -199,17 +224,20 @@ def check_tree(root, expected, label, sha):
 def check_inputs(kinds, base, sha=True):
     root, expected, label = BASES[base]
     check_tree(root, expected, label, sha)
-    if "tierE" in kinds:
-        check_tree(NEW_ROOT, EXPECTED_SHA_NEW,
-                   "Tier E network (DCC fixed_CA_28m)", sha)
+    for kind in kinds:
+        if kind not in NET_ROOTS:
+            continue
+        net_root, net_sha, net_label = NET_ROOTS[kind]
+        check_tree(net_root, net_sha, net_label, sha)
         for name in GRID_STATES:
             old = root / "modelstate" / name
-            new = NEW_ROOT / "modelstate" / name
+            new = net_root / "modelstate" / name
             assert new.exists(), \
                 f"missing {new}: copy it from {old.parent}"
             assert sha256(old) == sha256(new), \
                 f"{name} differs from the {root.name} one"
-            print(f"  ok  modelstate/{name} identical to {root.name}")
+            print(f"  ok  {net_root.name}/modelstate/{name} identical to "
+                  f"{root.name}")
     assert DHSVM_EXE.exists(), f"DHSVM executable not found: {DHSVM_EXE}"
 
 
@@ -256,13 +284,14 @@ def make_config(run, template, kind, smoke, base="jun"):
                 text, "Initial State Directory",
                 str(APR_ROOT / "modelstate") + "/", tag)
             n_expected += 4
-    if kind == "tierE":
+    if kind in NET_ROOTS:
+        net_root = NET_ROOTS[kind][0]
         for key, rel in STREAM_KEYS:
-            text, changed[key] = set_line(text, key, str(NEW_ROOT / rel),
+            text, changed[key] = set_line(text, key, str(net_root / rel),
                                           tag)
         text, changed["Initial State Directory"] = set_line(
             text, "Initial State Directory",
-            str(NEW_ROOT / "modelstate") + "/", tag)
+            str(net_root / "modelstate") + "/", tag)
         n_expected += 4
     out_prefix = CASE / "output" / prefix
     assert len(str(out_prefix)) <= MAX_OUTPUT_PATH, (
@@ -333,8 +362,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", nargs="+", default=list(RUNS),
                     choices=list(RUNS))
-    ap.add_argument("--kinds", nargs="+", default=KINDS, choices=KINDS,
-                    help="ctrl (old network) and/or tierE")
+    ap.add_argument("--kinds", nargs="+", default=KINDS[:2], choices=KINDS,
+                    help="ctrl (old network), tierE, ww (WW-DHSVM network)")
     ap.add_argument("--base", default="jun", choices=list(BASES),
                     help="jun: today's DEM_CA_0406; apr: DEM_CA_apr")
     ap.add_argument("--smoke", action="store_true",

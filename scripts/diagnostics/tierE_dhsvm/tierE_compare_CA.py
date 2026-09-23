@@ -56,8 +56,8 @@ MANUSCRIPT = {"CA_S4h": ["CA_S4h"],
               "CA_LAI70": ["CA_LAI70"],
               "CA_LAI20": ["CA_LAI20", "512_LAI20"]}
 TAGS = {"CA_S4h": "S4h", "CA_LAI70": "LAI70", "CA_LAI20": "LAI20"}
-WORDS = {"jun": {"ctrl": "old", "tierE": "new"},
-         "apr": {"ctrl": "oA", "tierE": "nA"}}
+WORDS = {"jun": {"ctrl": "old", "tierE": "new", "ww": "ww"},
+         "apr": {"ctrl": "oA", "tierE": "nA", "ww": "wA"}}
 
 
 def prefix_for(kind, run, smoke, base="jun"):
@@ -319,6 +319,20 @@ def compare_run(run, smoke, base="jun"):
     print("5. cumulative ChannelInt versus routed outflow")
     for p in manu[:1] + [ctrl, tier]:
         channelint_vs_routed(p)
+    # the WW-DHSVM network on the same inputs (cross-engine comparison,
+    # 2026-09-23), when its outputs exist
+    ww = prefix_for("ww", run, smoke, base)
+    if out_path(ww, "Aggregated.Values").exists():
+        print("6. cross-engine: control versus WW-DHSVM network, and Tier E "
+              "versus WW-DHSVM")
+        final_table([ctrl, tier, ww])
+        compare_pair(ctrl, ww, "control vs WW-DHSVM",
+                     f"tierE_compare_{run}_{ctrl}_vs_{ww}")
+        if out_path(tier, "Aggregated.Values").exists():
+            compare_pair(tier, ww, "Tier E vs WW-DHSVM",
+                         f"tierE_compare_{run}_{tier}_vs_{ww}")
+        check_r12(ww)
+        channelint_vs_routed(ww)
 
 
 def main():

@@ -1,0 +1,277 @@
+{
+ "case": "CA",
+ "area_m2": 47571.5,
+ "grid": {
+  "nrows": 74,
+  "ncols": 82,
+  "cellsize": 28.15774009521518,
+  "basin_cells": 4334,
+  "basin_km2": 3.4362
+ },
+ "inputs": {
+  "elev_clipped.tif": "181539c95da679c91fb9aea2dbba7a04db5ca18b81d3ff632a3f8e4114fb7d4e",
+  "slope_filled.tif": "c6c55348a735ead9a00f35b049e79c4191086c4cd20f217087417bb77a3a7321",
+  "flow_acc.tif": "f0126f0d2e24a90c8bb4be24e010ca4fbc076c50b3ceff06f7cf30a1213a3c65",
+  "stream_raster.tif": "6a6d112c238ebaa661174a5dd42f6d01108df940893bf0ed08083365f17ee9a0",
+  "stream_dir.tif": "7e1c7acbcafb26219da3a03c6b0bbc787c3a1fcadfee99197da7810e8ec40584",
+  "stream.class.dat": "26983e5342993a033cba391d720c81ce664c773cd3f0c554e16059e1999f4751",
+  "stream.network.dat": "6a01bd2f6c1d64049ca85c920dcbaed09aa2a37ef380b9791b6af3b36a474595",
+  "stream.map.dat": "a4f0f02ea78d8ab5c6c28d4d38c152f420bc3b772aff442ab2ec55b6d98dd442",
+  "segments.csv": "d283299e3bb00372e085eadca705a82074720a2667d1ab240ea4052ec9c37470",
+  "tile": "ad34883c05cb0c3d6eec7eec93d93d9eddfcb31dc61cd1c98ce2ce6ddeb4e92f"
+ },
+ "toolkit": {
+  "segments": 22,
+  "stream_cells": 231,
+  "map_records": 231,
+  "cells_under_two_segments": 0,
+  "outlets": [
+   12,
+   22
+  ],
+  "outlet_tails": {
+   "12": [
+    67,
+    68,
+    829.61
+   ],
+   "22": [
+    65,
+    68,
+    838.0
+   ]
+  },
+  "save_rows": 2,
+  "total_length_m": 7600.8,
+  "mean_segment_length_m": 345.5,
+  "rank_hist": {
+   "1": 12,
+   "2": 2,
+   "3": 2,
+   "4": 2,
+   "5": 1,
+   "6": 1,
+   "7": 1,
+   "8": 1
+  },
+  "max_rank": 8,
+  "indegree_hist": {
+   "0": 12,
+   "2": 10
+  },
+  "max_indegree": 2,
+  "class_hist": {
+   "13": 17,
+   "14": 5
+  },
+  "class_table": {
+   "13": {
+    "width": 0.5,
+    "depth": 0.1,
+    "n": 0.045
+   },
+   "14": {
+    "width": 1.0,
+    "depth": 0.1,
+    "n": 0.045
+   }
+  },
+  "max_acc_cell": [
+   63,
+   67
+  ],
+  "max_acc_cells": 3387.5,
+  "max_acc_in_outlet": true,
+  "max_acc_segment": 22,
+  "lowest_channel_cell": [
+   67,
+   68
+  ],
+  "lowest_channel_z": 829.61,
+  "lowest_in_outlet": true,
+  "lowest_segment": 12,
+  "drainage_density_km_per_km2": 2.212
+ },
+ "ww_dhsvm": {
+  "segments": 30,
+  "stream_cells": 266,
+  "map_records": 266,
+  "cells_under_two_segments": 0,
+  "outlets": [
+   29
+  ],
+  "outlet_tails": {
+   "29": [
+    68,
+    68,
+    826.81
+   ]
+  },
+  "save_rows": 1,
+  "total_length_m": 8901.2,
+  "mean_segment_length_m": 296.7,
+  "rank_hist": {
+   "1": 16,
+   "2": 4,
+   "3": 2,
+   "4": 2,
+   "5": 1,
+   "6": 1,
+   "7": 1,
+   "8": 1,
+   "9": 1,
+   "10": 1
+  },
+  "max_rank": 10,
+  "indegree_hist": {
+   "0": 16,
+   "2": 13,
+   "3": 1
+  },
+  "max_indegree": 3,
+  "class_hist": {
+   "6": 1,
+   "13": 11,
+   "14": 5,
+   "15": 3,
+   "16": 4,
+   "17": 2,
+   "18": 4
+  },
+  "class_table": {
+   "6": {
+    "width": 3.567,
+    "depth": 0.352,
+    "n": 0.03
+   },
+   "13": {
+    "width": 0.724,
+    "depth": 0.15,
+    "n": 0.1
+   },
+   "14": {
+    "width": 0.997,
+    "depth": 0.15,
+    "n": 0.1
+   },
+   "15": {
+    "width": 1.371,
+    "depth": 0.186,
+    "n": 0.1
+   },
+   "16": {
+    "width": 1.886,
+    "depth": 0.23,
+    "n": 0.1
+   },
+   "17": {
+    "width": 2.594,
+    "depth": 0.284,
+    "n": 0.1
+   },
+   "18": {
+    "width": 3.567,
+    "depth": 0.352,
+    "n": 0.1
+   }
+  },
+  "max_acc_cell": [
+   68,
+   68
+  ],
+  "max_acc_cells": 4334.0,
+  "max_acc_in_outlet": true,
+  "max_acc_segment": 29,
+  "lowest_channel_cell": [
+   68,
+   68
+  ],
+  "lowest_channel_z": 826.81,
+  "lowest_in_outlet": true,
+  "lowest_segment": 29,
+  "drainage_density_km_per_km2": 2.59
+ },
+ "overlap": {
+  "toolkit_cells": 231,
+  "ww_cells": 266,
+  "common": 153,
+  "toolkit_only": 78,
+  "ww_only": 113,
+  "jaccard": 0.445,
+  "toolkit_max_acc_cell_is_ww_channel": true,
+  "ww_max_acc_cell_is_toolkit_channel": false,
+  "toolkit_outlet_tails_in_ww": [
+   true,
+   true
+  ],
+  "common_by_acc_band": {
+   "0-60": {
+    "toolkit": 5,
+    "ww": 77,
+    "common": 1
+   },
+   "60-120": {
+    "toolkit": 56,
+    "ww": 52,
+    "common": 31
+   },
+   "120-300": {
+    "toolkit": 73,
+    "ww": 46,
+    "common": 37
+   },
+   "300-1000": {
+    "toolkit": 44,
+    "ww": 43,
+    "common": 36
+   },
+   "1000-max": {
+    "toolkit": 53,
+    "ww": 48,
+    "common": 48
+   }
+  }
+ },
+ "ww_checks": {
+  "topology_ok": true,
+  "errors": [],
+  "warnings": [],
+  "outlets": {
+   "ok": true,
+   "max_area_cell": [
+    68,
+    68
+   ],
+   "max_area_segment": 29,
+   "lowest_cell": [
+    68,
+    68
+   ],
+   "lowest_segment": 29,
+   "outlet_segments": [
+    29
+   ],
+   "outlet_tails": [
+    [
+     68,
+     68
+    ]
+   ],
+   "n_edge_outlets": 1
+  },
+  "drop_objective_cells": 120,
+  "drop_objective_km2": 0.09514299927236262,
+  "drop_band_cells": [
+   120,
+   600
+  ],
+  "fill_cells_raised": 0,
+  "stream_cells_at_objective": 191,
+  "segments_at_objective": 17
+ },
+ "ww_files": {
+  "class": "8e99b33ae558a55be2ef314c56e11b013788d2243d11781923abfbbbc5c49282",
+  "network": "890970f541bfbc55cf7d8d5aab762d3a491310756aa7b773e46c61daffa282fd",
+  "map": "22d4dddb3edebefac2106c5a5b674160ab7c9d816e989e44d2fa3e8b21a7806e"
+ }
+}

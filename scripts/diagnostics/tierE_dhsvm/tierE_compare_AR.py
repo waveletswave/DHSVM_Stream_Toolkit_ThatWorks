@@ -33,7 +33,7 @@ CASE = Path(os.environ.get(
     "TIERE_CASE",
     "/Users/benthosyy/Desktop/CodeBits/DHSVM-PNNL-2025/TestCase/AR"))
 MANUSCRIPT = "S4h"
-WORDS = {"ctrl": "oA", "tierE": "nA", "new": "new"}
+WORDS = {"ctrl": "oA", "tierE": "nA", "new": "new", "ww": "wA"}
 
 
 def prefix_for(kind, smoke):
@@ -297,6 +297,22 @@ def compare_run(smoke):
     print("6. cumulative ChannelInt versus routed outflow")
     for p in (MANUSCRIPT, ctrl, tier, new):
         channelint_vs_routed(p)
+    # the WW-DHSVM network on the same inputs (cross-engine comparison,
+    # 2026-09-23), when its outputs exist
+    ww = prefix_for("ww", smoke)
+    if out_path(ww, "Aggregated.Values").exists():
+        print("7. cross-engine: control versus WW-DHSVM network, and Tier E "
+              "versus WW-DHSVM")
+        final_table([ctrl, tier, ww])
+        for label, base in (("control vs WW-DHSVM", ctrl),
+                            ("Tier E vs WW-DHSVM", tier)):
+            if out_path(base, "Aggregated.Values").exists():
+                compare_pair(base, ww, label,
+                             f"tierE_compare_AR_{base}_vs_{ww}")
+            else:
+                print(f"  {base}: Aggregated.Values missing")
+        check_r12(ww)
+        channelint_vs_routed(ww)
 
 
 def main():

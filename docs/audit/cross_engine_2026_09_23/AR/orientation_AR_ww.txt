@@ -1,0 +1,55 @@
+======================================================================
+Tier E network orientation diagnostic   label=AR_ww
+======================================================================
+pipeline dir /home/claude/toolkit/standalone_CA/pipeline
+repo HEAD f6201e5   rasterio 1.4.4   geopandas 1.1.4   numpy 2.4.4
+inputs:
+  dem    /home/claude/xeng/AR/ww_rasters/elev_clipped.tif  sha256=a0e570a8e6ee6ca2
+  acc    /home/claude/xeng/AR/ww_rasters/flow_acc.tif  sha256=f641b6b68906cb03
+  srast  /home/claude/xeng/AR/ww_rasters/stream_raster.tif  sha256=4593354e74d4760b
+  fdir   /home/claude/xeng/AR/ww_rasters/flow_dir.tif  sha256=f62268972e4a468c
+  attr   /home/claude/xeng/AR/ww_rasters/streamfile_attr.shp  MISSING
+  net    /home/claude/xeng/AR/ww_streams/stream.network.dat  sha256=3ce3cac9365a9682
+  map    /home/claude/xeng/AR/ww_streams/stream.map.dat  sha256=0413270a3e800c4a
+  cls    /home/claude/xeng/AR/ww_streams/stream.class.dat  sha256=696ebf8beab15040
+
+grid: 55 rows x 72 cols, cell 28.158 x 28.158 m (area 792.86 m2), CRS EPSG:32617
+valid DEM cells 2870, valid acc cells 2870, stream-raster cells 203, boundary cells 265
+
+D1  accumulation sign
+    all valid cells: min 1.0  max 2870.0  negative 0  zero 0  positive 2870
+    stream-raster cells: 0 of 203 negative (0.0 %)
+
+D2  pour point candidates (0-based row, col; row 0 = north, as in stream.map.dat)
+    max |acc| cell: (row 53, col 41)  |acc| 2870.0 cells  z 796.61 m  on mask boundary: True  in stream raster: True
+    lowest stream-raster cell: (row 53, col 41)  z 796.61 m  |acc| 2870.0
+    lowest valid DEM cell: (row 53, col 41)  z 796.61 m  in stream raster: True
+    distance max|acc| cell -> lowest stream cell: 0.0 cells
+
+D3  written network (stream.network.dat / stream.map.dat)
+    segments 29, map records 203, distinct map cells 203, cells under 2+ segments 0, map cells not in stream raster 0
+    outlet segments (down = 0): [29]   SAVE flags: [29]
+    order (nin) histogram: {1: 15, 2: 4, 3: 3, 4: 2, 5: 2, 6: 1, 7: 1, 8: 1}
+    in-degree histogram: {0: 15, 2: 14}
+    highest in-degree segments: [(9, 2), (16, 2), (15, 2)]
+    classes used: {13: 12, 14: 4, 15: 4, 16: 5, 17: 1, 18: 3}   class table: 1: W 0.74 D 0.15 n 0.03, 2: W 0.98 D 0.15 n 0.03, 3: W 1.297 D 0.179 n 0.03, 4: W 1.717 D 0.216 n 0.03, 5: W 2.273 D 0.26 n 0.03, 6: W 3.008 D 0.314 n 0.03, 7: W 0.74 D 0.15 n 0.05, 8: W 0.98 D 0.15 n 0.05, 9: W 1.297 D 0.179 n 0.05, 10: W 1.717 D 0.216 n 0.05, 11: W 2.273 D 0.26 n 0.05, 12: W 3.008 D 0.314 n 0.05, 13: W 0.74 D 0.15 n 0.1, 14: W 0.98 D 0.15 n 0.1, 15: W 1.297 D 0.179 n 0.1, 16: W 1.717 D 0.216 n 0.1, 17: W 2.273 D 0.26 n 0.1, 18: W 3.008 D 0.314 n 0.1
+
+D3  outlet segment(s) as written
+    segment 29: nin 8  slope 0.08653  length 203.936  class 18  in-degree 2
+      map cells 6  |acc| on cells 2822.0..2870.0 (basin max 2870.0)  z 796.61..814.25 m (lowest stream cell 796.61)
+      mean (row 50.5, col 42.2)  nearest cell to max|acc| cell: 0.0 cells
+
+D4  segment(s) holding the max-|acc| cell and the lowest stream cell
+    max |acc| cell: segment 29  down 0  nin 8  in-degree 2  <-- IS the written outlet
+    lowest stream cell: segment 29  down 0  nin 8  in-degree 2  <-- IS the written outlet
+
+D5  max in-degree 2  (dendritic expectation: 2, at most 3)
+
+D7  streamfile_attr.shp missing at /home/claude/xeng/AR/ww_rasters/streamfile_attr.shp; Part B skipped
+
+invariants
+    PASS  I1 outlet segment holds the max-|acc| cell (informational: MFD accumulation is not monotone)
+    PASS  I2 lowest stream cell lies in an outlet segment
+    PASS  I5 max in-degree <= 3
+
+AR_ww: 0 hard invariant(s) failed
