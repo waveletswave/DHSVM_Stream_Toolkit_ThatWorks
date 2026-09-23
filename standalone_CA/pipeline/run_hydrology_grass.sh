@@ -5,8 +5,9 @@
 # Single GRASS location, three modules chained in one mapset (option i):
 #   r.watershed  ->  r.stream.extract  ->  r.to.vect
 # Mirrors the three grass7: processing.run calls in prep_dhsvm_inputs.py.
-# Intermediate rasters stay inside GRASS; only the four reference outputs
-# are exported (flow_acc, flow_dir, stream_raster, streamfile vector).
+# Intermediate rasters stay inside GRASS; the four reference outputs are
+# exported (flow_acc, flow_dir, stream_raster, streamfile vector), plus,
+# since Tier E, the D8 direction r.stream.extract followed (stream_dir).
 #
 # Run through the Py3 shim, region locked to the clipped DEM, same pattern
 # as the slope stage. CRS is stamped back onto the GeoTIFF exports by the
@@ -56,6 +57,7 @@ r.watershed elevation=elev_in accumulation=flow_acc drainage=flow_dir \
 # actually ran without -m; we drop it too. memory= is the only memory control.
 r.stream.extract elevation=elev_in accumulation=flow_acc threshold=$THRESH \
     stream_raster=stream_rast stream_vector=stream_vec_native \
+    direction=stream_dir \
     memory=$MEM --overwrite --quiet
 
 # --- r.to.vect fallback: stream raster -> lines ---
@@ -65,12 +67,17 @@ r.stream.extract elevation=elev_in accumulation=flow_acc threshold=$THRESH \
 # Reproduce that here. Validation against streamfile.shp (41 lines) is the check.
 r.to.vect input=stream_rast output=streamfile_vec type=line --overwrite --quiet
 
-# --- exports: only the four reference artifacts ---
+# --- exports: the four reference artifacts, plus the stream direction ---
 # flow_acc is DCELL (negative on CA), exported as Float64 by default.
 # flow_dir and stream_rast are CELL (int).
 r.out.gdal input=flow_acc    output="$OUTDIR/flow_acc.tif"      format=GTiff --overwrite --quiet
 r.out.gdal input=flow_dir    output="$OUTDIR/flow_dir.tif"      format=GTiff --overwrite --quiet
 r.out.gdal input=stream_rast output="$OUTDIR/stream_raster.tif" format=GTiff --overwrite --quiet
+# Tier E: the D8 direction the extracted streams follow. For stream cells
+# r.stream.extract continues to the lower neighbour with the largest |acc|,
+# which can differ from the r.watershed drainage; this raster is the one the
+# raster-native network stage (segments_from_raster.py) walks.
+r.out.gdal input=stream_dir  output="$OUTDIR/stream_dir.tif"     format=GTiff --overwrite --quiet
 
 # Vector export to shapefile (the fallback stream lines).
 v.out.ogr input=streamfile_vec output="$OUTDIR/streamfile.shp" format=ESRI_Shapefile --overwrite --quiet

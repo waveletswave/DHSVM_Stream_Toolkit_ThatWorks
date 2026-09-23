@@ -26,14 +26,15 @@ from pathlib import Path
 from rasterio.crs import CRS
 import rasterio
 
-from paths import ELEV_CLIPPED, OUT, EPSG, FLOW_ACC, FLOW_DIR, STREAM_RASTER, SHIM, STREAM_SOURCE_AREA_M2
+from paths import (ELEV_CLIPPED, OUT, EPSG, FLOW_ACC, FLOW_DIR, STREAM_RASTER,
+                   STREAM_DIR, SHIM, STREAM_SOURCE_AREA_M2)
 
 DEM_TIF  = ELEV_CLIPPED
 OUT_DIR  = OUT
 HYDRO_SH = Path(__file__).resolve().parent / "run_hydrology_grass.sh"
 
 # GeoTIFF exports that need a CRS stamp (vector shp carries its own .prj).
-RASTER_OUTPUTS = [FLOW_ACC, FLOW_DIR, STREAM_RASTER]
+RASTER_OUTPUTS = [FLOW_ACC, FLOW_DIR, STREAM_RASTER, STREAM_DIR]
 
 
 def run_grass_chain():
